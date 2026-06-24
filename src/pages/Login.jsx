@@ -1,10 +1,6 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
-
-const CREDENTIALS = {
-  email: 'admin@gmail.com',
-  password: 'admin@123',
-};
+import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
+import { api } from '../services/api';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -13,40 +9,36 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    setTimeout(() => {
-      if (email === CREDENTIALS.email && password === CREDENTIALS.password) {
-        onLogin();
+    try {
+      const data = await api.post('/api/auth/admin/login', { email, password });
+      if (data.success) {
+        onLogin(data.data.user, data.data.tokens);
       } else {
-        setError('Invalid email or password.');
+        setError(data.message || 'Invalid email or password.');
       }
+    } catch {
+      setError('Network error. Please check your connection.');
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#041E42] flex items-center justify-center p-4">
-      {/* Background glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#17D86B]/10 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
 
-          {/* Logo */}
           <div className="flex flex-col items-center mb-6">
-            <img
-              src="/gadidost-logo.png"
-              alt="GadiDost"
-              className="h-12 w-auto object-contain mb-2"
-            />
+            <img src="/gadidost-logo.png" alt="GadiDost" className="h-12 w-auto object-contain mb-2" />
             <span className="text-xs font-semibold text-neutral-400 tracking-widest uppercase">
               Admin Panel
             </span>
@@ -58,7 +50,6 @@ export default function Login({ onLogin }) {
           <p className="text-sm text-neutral-500 mb-6">Sign in to your admin account</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                 Email address
@@ -69,14 +60,13 @@ export default function Login({ onLogin }) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@gmail.com"
+                  placeholder="admin@ssklogistics.in"
                   required
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                 Password
@@ -101,29 +91,26 @@ export default function Login({ onLogin }) {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-2.5">
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-2.5">
+                <AlertCircle size={15} className="flex-shrink-0" />
                 {error}
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-all duration-200 mt-2"
+              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-all duration-200 mt-2 flex items-center justify-center gap-2"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in...
+                </>
+              ) : 'Sign in'}
             </button>
           </form>
-
-          {/* Hint */}
-          <div className="mt-6 p-3 bg-neutral-50 rounded-lg border border-neutral-100">
-            <p className="text-xs text-neutral-500 font-medium mb-1">Demo credentials</p>
-            <p className="text-xs text-neutral-600">Email: <span className="font-mono">admin@gmail.com</span></p>
-            <p className="text-xs text-neutral-600">Password: <span className="font-mono">admin@123</span></p>
-          </div>
         </div>
 
         <p className="text-center text-white/30 text-xs mt-6">© 2024 SSK Logistics · GadiDost</p>

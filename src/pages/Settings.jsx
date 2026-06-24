@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Save, Globe, Bell, Shield, User, Lock,
-  Camera, Eye, EyeOff, Mail, Phone, IndianRupee,
+  Camera, Eye, EyeOff, Mail, Phone, IndianRupee, AlertCircle, CheckCircle,
 } from 'lucide-react';
 import Toast from '../components/Toast';
 import { settingsData } from '../data/mockData';
+import { api, getStoredAuth } from '../services/api';
 
 const tabs = [
   { id: 'profile',       label: 'My Profile',    icon: User },
@@ -41,7 +42,7 @@ function Field({ label, description, children }) {
   );
 }
 
-function PwField({ label, fieldKey, value, show, onToggleShow, onChange, placeholder }) {
+function PwField({ label, value, show, onToggleShow, onChange, placeholder }) {
   return (
     <div className="max-w-sm">
       <label className="form-label">{label}</label>
@@ -70,28 +71,72 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [toast, setToast] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [settings, setSettings] = useState(settingsData);
 
   const [profile, setProfile] = useState({
-    name: 'Admin User',
-    email: 'admin@gmail.com',
-    phone: '+91 98765 00000',
+    name: '',
+    email: '',
+    phone: '',
     role: 'Super Admin',
-    joined: 'December 2024',
+    joined: '',
   });
 
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
 
-  const save = (section) => {
+  const getToken = useCallback(() => getStoredAuth()?.tokens?.access_token, []);
+
+  // Load real profile from API
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = getToken();
+      if (!token) { setProfileLoading(false); return; }
+      try {
+        const data = await api.get('/api/user/profile', token);
+        if (data.success) {
+          const u = data.data.user;
+          setProfile({
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone ? `+91 ${u.phone}` : '',
+            role: u.role === 'admin' ? 'Super Admin' : u.role,
+            joined: u.created_at
+              ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              : '',
+          });
+        }
+      } catch {}
+      setProfileLoading(false);
+    };
+    fetchProfile();
+  }, [getToken]);
+
+  const saveProfile = async () => {
+    const token = getToken();
+    if (!token) return;
     setSaving(true);
-    setTimeout(() => {
+    try {
+      const data = await api.put('/api/user/profile', { name: profile.name, email: profile.email }, token);
+      if (data.success) {
+        setToast({ message: 'Profile saved successfully', type: 'success' });
+        // Update stored auth with new user data
+        const stored = getStoredAuth();
+        if (stored) {
+          stored.user = { ...stored.user, name: profile.name, email: profile.email };
+          localStorage.setItem('ssk_admin_auth', JSON.stringify(stored));
+        }
+      } else {
+        setToast({ message: data.message || 'Failed to save profile', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Network error. Please try again.', type: 'error' });
+    } finally {
       setSaving(false);
-      setToast({ message: `${section} saved successfully`, type: 'success' });
-    }, 700);
+    }
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (!passwords.current || !passwords.next || !passwords.confirm) {
       return setToast({ message: 'Please fill all password fields', type: 'error' });
     }
@@ -101,15 +146,41 @@ export default function Settings() {
     if (passwords.next.length < 6) {
       return setToast({ message: 'Password must be at least 6 characters', type: 'error' });
     }
-    setPasswords({ current: '', next: '', confirm: '' });
-    setToast({ message: 'Password updated successfully', type: 'success' });
+    const token = getToken();
+    if (!token) return;
+    setSaving(true);
+    try {
+      const data = await api.put('/api/user/change-password', {
+        current_password: passwords.current,
+        new_password: passwords.next,
+      }, token);
+      if (data.success) {
+        setPasswords({ current: '', next: '', confirm: '' });
+        setToast({ message: 'Password updated successfully', type: 'success' });
+      } else {
+        setToast({ message: data.message || 'Failed to change password', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Network error. Please try again.', type: 'error' });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const initials = profile.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+  const save = (section) => {
+    setSaving(true);
+    setTimeout(() => {
+      setSaving(false);
+      setToast({ message: `${section} saved successfully`, type: 'success' });
+    }, 700);
+  };
+
+  const initials = profile.name
+    ? profile.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'AU';
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-poppins font-bold text-secondary">Settings</h1>
         <p className="text-sm text-neutral-500 mt-0.5">Manage your account, platform configuration, and preferences</p>
@@ -150,74 +221,84 @@ export default function Settings() {
                 <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">{profile.role}</span>
               </div>
               <div className="p-6 space-y-6">
-                {/* Avatar row */}
-                <div className="flex items-center gap-5 p-4 bg-neutral-50 rounded-2xl">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center shadow-sm">
-                      <span className="text-white font-poppins font-bold text-2xl">{initials}</span>
-                    </div>
-                    <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-secondary rounded-lg flex items-center justify-center border-2 border-white hover:bg-secondary-light transition-colors">
-                      <Camera size={12} className="text-white" />
-                    </button>
+                {profileLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   </div>
-                  <div>
-                    <p className="font-poppins font-bold text-secondary text-lg leading-tight">{profile.name}</p>
-                    <p className="text-sm text-neutral-500 mt-0.5">{profile.email}</p>
-                    <p className="text-xs text-neutral-400 mt-2 bg-white border border-neutral-200 rounded-lg px-2.5 py-1 inline-block">
-                      Member since {profile.joined}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Full Name">
-                    <input
-                      type="text"
-                      value={profile.name}
-                      onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Role">
-                    <input
-                      type="text"
-                      value={profile.role}
-                      readOnly
-                      className="form-input bg-neutral-50 text-neutral-400 cursor-not-allowed"
-                    />
-                  </Field>
-                  <Field label="Email Address">
-                    <div className="relative">
-                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                      <input
-                        type="email"
-                        value={profile.email}
-                        onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
-                        className="form-input pl-10"
-                      />
+                ) : (
+                  <>
+                    {/* Avatar row */}
+                    <div className="flex items-center gap-5 p-4 bg-neutral-50 rounded-2xl">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center shadow-sm">
+                          <span className="text-white font-poppins font-bold text-2xl">{initials}</span>
+                        </div>
+                        <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-secondary rounded-lg flex items-center justify-center border-2 border-white hover:bg-secondary-light transition-colors">
+                          <Camera size={12} className="text-white" />
+                        </button>
+                      </div>
+                      <div>
+                        <p className="font-poppins font-bold text-secondary text-lg leading-tight">{profile.name}</p>
+                        <p className="text-sm text-neutral-500 mt-0.5">{profile.email}</p>
+                        {profile.joined && (
+                          <p className="text-xs text-neutral-400 mt-2 bg-white border border-neutral-200 rounded-lg px-2.5 py-1 inline-block">
+                            Member since {profile.joined}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </Field>
-                  <Field label="Phone Number">
-                    <div className="relative">
-                      <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                      <input
-                        type="tel"
-                        value={profile.phone}
-                        onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
-                        className="form-input pl-10"
-                      />
-                    </div>
-                  </Field>
-                </div>
 
-                <div className="flex justify-end pt-2 border-t border-neutral-100">
-                  <button onClick={() => save('Profile')} disabled={saving} className="btn-primary">
-                    {saving
-                      ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
-                      : <><Save size={15} />Save Profile</>}
-                  </button>
-                </div>
+                    {/* Fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Field label="Full Name">
+                        <input
+                          type="text"
+                          value={profile.name}
+                          onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
+                          className="form-input"
+                        />
+                      </Field>
+                      <Field label="Role">
+                        <input
+                          type="text"
+                          value={profile.role}
+                          readOnly
+                          className="form-input bg-neutral-50 text-neutral-400 cursor-not-allowed"
+                        />
+                      </Field>
+                      <Field label="Email Address">
+                        <div className="relative">
+                          <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                          <input
+                            type="email"
+                            value={profile.email}
+                            onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+                            className="form-input pl-10"
+                          />
+                        </div>
+                      </Field>
+                      <Field label="Phone Number" description="Contact support to change phone number">
+                        <div className="relative">
+                          <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                          <input
+                            type="tel"
+                            value={profile.phone}
+                            readOnly
+                            className="form-input pl-10 bg-neutral-50 text-neutral-400 cursor-not-allowed"
+                          />
+                        </div>
+                      </Field>
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-neutral-100">
+                      <button onClick={saveProfile} disabled={saving} className="btn-primary">
+                        {saving
+                          ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
+                          : <><Save size={15} />Save Profile</>}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -301,7 +382,6 @@ export default function Settings() {
                   </Field>
                 </div>
 
-                {/* Info callout */}
                 <div className="bg-primary/5 border border-primary/15 rounded-2xl p-4">
                   <p className="text-xs font-bold text-primary mb-1.5">How commission is calculated</p>
                   <p className="text-xs text-neutral-600 leading-relaxed">
@@ -328,30 +408,10 @@ export default function Settings() {
               </div>
               <div className="p-6">
                 <div className="divide-y divide-neutral-100">
-                  <Toggle
-                    enabled={settings.emailAlerts}
-                    onChange={() => setSettings((p) => ({ ...p, emailAlerts: !p.emailAlerts }))}
-                    label="Email Alerts"
-                    description="Booking confirmations, cancellations, and platform reports via email"
-                  />
-                  <Toggle
-                    enabled={settings.smsAlerts}
-                    onChange={() => setSettings((p) => ({ ...p, smsAlerts: !p.smsAlerts }))}
-                    label="SMS Alerts"
-                    description="Critical alerts and OTPs sent to your registered mobile number"
-                  />
-                  <Toggle
-                    enabled={settings.pushNotifications}
-                    onChange={() => setSettings((p) => ({ ...p, pushNotifications: !p.pushNotifications }))}
-                    label="Push Notifications"
-                    description="Real-time browser notifications for new bookings and open disputes"
-                  />
-                  <Toggle
-                    enabled
-                    onChange={() => {}}
-                    label="Weekly Summary Report"
-                    description="Automated report delivered every Monday at 9 AM IST"
-                  />
+                  <Toggle enabled={settings.emailAlerts} onChange={() => setSettings((p) => ({ ...p, emailAlerts: !p.emailAlerts }))} label="Email Alerts" description="Booking confirmations, cancellations, and platform reports via email" />
+                  <Toggle enabled={settings.smsAlerts} onChange={() => setSettings((p) => ({ ...p, smsAlerts: !p.smsAlerts }))} label="SMS Alerts" description="Critical alerts and OTPs sent to your registered mobile number" />
+                  <Toggle enabled={settings.pushNotifications} onChange={() => setSettings((p) => ({ ...p, pushNotifications: !p.pushNotifications }))} label="Push Notifications" description="Real-time browser notifications for new bookings and open disputes" />
+                  <Toggle enabled onChange={() => {}} label="Weekly Summary Report" description="Automated report delivered every Monday at 9 AM IST" />
                 </div>
                 <div className="flex justify-end pt-4 border-t border-neutral-100 mt-2">
                   <button onClick={() => save('Notification preferences')} className="btn-primary">
@@ -365,42 +425,42 @@ export default function Settings() {
           {/* ═══ SECURITY ═══ */}
           {activeTab === 'security' && (
             <div className="space-y-5">
-              {/* Change password */}
               <div className="card">
                 <div className="card-header">
                   <h3 className="card-title">Change Password</h3>
                 </div>
                 <div className="p-6 space-y-4">
                   <PwField
-                    label="Current Password" fieldKey="current"
+                    label="Current Password"
                     value={passwords.current} show={showPw.current}
                     onToggleShow={() => setShowPw((p) => ({ ...p, current: !p.current }))}
                     onChange={(v) => setPasswords((p) => ({ ...p, current: v }))}
                     placeholder="Enter your current password"
                   />
                   <PwField
-                    label="New Password" fieldKey="next"
+                    label="New Password"
                     value={passwords.next} show={showPw.next}
                     onToggleShow={() => setShowPw((p) => ({ ...p, next: !p.next }))}
                     onChange={(v) => setPasswords((p) => ({ ...p, next: v }))}
                     placeholder="Minimum 6 characters"
                   />
                   <PwField
-                    label="Confirm New Password" fieldKey="confirm"
+                    label="Confirm New Password"
                     value={passwords.confirm} show={showPw.confirm}
                     onToggleShow={() => setShowPw((p) => ({ ...p, confirm: !p.confirm }))}
                     onChange={(v) => setPasswords((p) => ({ ...p, confirm: v }))}
                     placeholder="Re-enter new password"
                   />
                   <div className="flex justify-end pt-2 border-t border-neutral-100">
-                    <button onClick={handlePasswordChange} className="btn-primary">
-                      <Shield size={15} /> Update Password
+                    <button onClick={handlePasswordChange} disabled={saving} className="btn-primary">
+                      {saving
+                        ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
+                        : <><Shield size={15} /> Update Password</>}
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Active session */}
               <div className="card">
                 <div className="card-header">
                   <h3 className="card-title">Active Session</h3>

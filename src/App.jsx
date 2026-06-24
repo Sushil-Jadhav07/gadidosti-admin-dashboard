@@ -15,26 +15,43 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('ssk_auth') === 'true');
+  const [authData, setAuthData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ssk_admin_auth')); } catch { return null; }
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogin = () => {
-    localStorage.setItem('ssk_auth', 'true');
-    setIsLoggedIn(true);
+  const isLoggedIn = !!authData;
+
+  const handleLogin = (user, tokens) => {
+    const data = { user, tokens };
+    localStorage.setItem('ssk_admin_auth', JSON.stringify(data));
+    setAuthData(data);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('ssk_auth');
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
+    try {
+      if (authData?.tokens) {
+        await fetch(`${API_BASE}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authData.tokens.access_token}`,
+          },
+          body: JSON.stringify({ refresh_token: authData.tokens.refresh_token }),
+        });
+      }
+    } catch { /* silently ignore */ }
+    localStorage.removeItem('ssk_admin_auth');
+    setAuthData(null);
   };
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setSidebarCollapsed(true);
-      }
+      if (window.innerWidth < 1024) setSidebarCollapsed(true);
     };
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -50,12 +67,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F0F4FA]">
-      {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </div>
 
-      {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)}></div>
@@ -65,22 +80,21 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content Area */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
         <TopBar onMenuClick={toggleMobile} sidebarCollapsed={sidebarCollapsed} onLogout={handleLogout} />
         <main className="px-4 pt-4 pb-8 lg:px-6 lg:pt-5 lg:pb-10 min-h-[calc(100vh-4rem)]">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/bookings" element={<Bookings />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="/brokers" element={<Brokers />} />
-            <Route path="/drivers" element={<Drivers />} />
-            <Route path="/trucks" element={<Trucks />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/disputes" element={<Disputes />} />
-            <Route path="/kyc" element={<KYC />} />
+            <Route path="/"          element={<Dashboard />} />
+            <Route path="/bookings"  element={<Bookings />} />
+            <Route path="/users"     element={<Users />} />
+            <Route path="/brokers"   element={<Brokers />} />
+            <Route path="/drivers"   element={<Drivers />} />
+            <Route path="/trucks"    element={<Trucks />} />
+            <Route path="/pricing"   element={<Pricing />} />
+            <Route path="/disputes"  element={<Disputes />} />
+            <Route path="/kyc"       element={<KYC />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings"  element={<Settings />} />
           </Routes>
         </main>
       </div>
