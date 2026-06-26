@@ -81,7 +81,7 @@ export default function App() {
       )}
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-        <TopBar onMenuClick={toggleMobile} sidebarCollapsed={sidebarCollapsed} onLogout={handleLogout} />
+        <TopBar onMenuClick={toggleMobile} sidebarCollapsed={sidebarCollapsed} onLogout={handleLogout} user={authData?.user} />
         <main className="px-4 pt-4 pb-8 lg:px-6 lg:pt-5 lg:pb-10 min-h-[calc(100vh-4rem)]">
           <Routes>
             <Route path="/"          element={<Dashboard />} />

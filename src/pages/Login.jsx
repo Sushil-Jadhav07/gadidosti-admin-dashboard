@@ -14,7 +14,7 @@ export default function Login({ onLogin }) {
     setError('');
     setLoading(true);
     try {
-      const data = await api.post('/api/auth/admin/login', { email, password });
+      const data = await api.post('/api/auth/login', { email, password });
       if (data.success) {
         onLogin(data.data.user, data.data.tokens);
       } else {
