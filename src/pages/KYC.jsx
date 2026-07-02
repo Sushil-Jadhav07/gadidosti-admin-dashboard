@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, CheckCircle, XCircle, ChevronLeft, ChevronRight, FileText, ShieldCheck } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
-import { brokerKYC, driverKYC } from '../data/mockData';
+import { api, getToken } from '../services/api';
+
+const STATUS_LABEL = { submitted: 'Pending', verified: 'Verified', rejected: 'Rejected' };
 
 function DocumentPlaceholder({ label }) {
   return (
@@ -14,17 +16,77 @@ function DocumentPlaceholder({ label }) {
   );
 }
 
+// Maps a raw /api/admin/kyc/pending submission row into what this page's UI expects
+function mapBroker(s) {
+  const d = s.documents || {};
+  return {
+    id: s.user_id,
+    name: s.name,
+    pan: d.pan_number || '—',
+    aadhaar: d.aadhaar_number || '—',
+    gst: d.gst_number || '—',
+    bankAccount: d.bank_account_number || '—',
+    businessReg: d.business_registration_number || null,
+    submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
+    status: STATUS_LABEL[s.kyc_status] || s.kyc_status,
+    rejectionReason: s.rejection_reason,
+  };
+}
+
+function mapDriver(s) {
+  const d = s.documents || {};
+  return {
+    id: s.user_id,
+    name: s.name,
+    licenseNo: d.license_number || '—',
+    aadhaar: d.aadhaar_number || '—',
+    vehicleReg: d.vehicle_registration_number || null,
+    vehicleIns: d.vehicle_insurance_number || null,
+    submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
+    status: STATUS_LABEL[s.kyc_status] || s.kyc_status,
+    rejectionReason: s.rejection_reason,
+  };
+}
+
 export default function KYC() {
   const [activeTab, setActiveTab] = useState('brokers');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedKYC, setSelectedKYC] = useState(null);
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [actionLoading, setActionLoading] = useState(null);
   const [toast, setToast] = useState(null);
-  const [brokerData, setBrokerData] = useState(brokerKYC);
-  const [driverData, setDriverData] = useState(driverKYC);
+  const [brokerData, setBrokerData] = useState([]);
+  const [driverData, setDriverData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const itemsPerPage = 8;
 
+  const showToast = (message, type = 'success') => setToast({ message, type });
+
+  const fetchKyc = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [brokerRes, driverRes] = await Promise.all([
+        api.get('/api/admin/kyc/pending?role=broker&limit=100', getToken()),
+        api.get('/api/admin/kyc/pending?role=driver&limit=100', getToken()),
+      ]);
+      if (brokerRes.success) setBrokerData(brokerRes.data.submissions.map(mapBroker));
+      if (driverRes.success) setDriverData(driverRes.data.submissions.map(mapDriver));
+      if (!brokerRes.success || !driverRes.success) setError('Failed to load some KYC data');
+    } catch {
+      setError('Network error — could not load KYC submissions');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchKyc(); }, [fetchKyc]);
+
   const data = activeTab === 'brokers' ? brokerData : driverData;
+  const setData = activeTab === 'brokers' ? setBrokerData : setDriverData;
 
   const filtered = data.filter((k) =>
     !searchTerm || k.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -34,22 +96,48 @@ export default function KYC() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleApprove = (name) => {
-    if (activeTab === 'brokers') {
-      setBrokerData(prev => prev.map(k => k.name === name ? { ...k, status: 'Verified' } : k));
-    } else {
-      setDriverData(prev => prev.map(k => k.name === name ? { ...k, status: 'Verified' } : k));
+  const handleApprove = async (id, name) => {
+    setActionLoading(id + '_verify');
+    try {
+      const res = await api.patch(`/api/admin/kyc/${id}/verify`, {}, getToken());
+      if (res.success) {
+        setData((prev) => prev.map((k) => k.id === id ? { ...k, status: 'Verified' } : k));
+        showToast(`${name}'s KYC approved successfully`);
+      } else {
+        showToast(res.message || 'Failed to approve KYC', 'error');
+      }
+    } catch {
+      showToast('Network error — could not approve KYC', 'error');
+    } finally {
+      setActionLoading(null);
     }
-    setToast({ message: `${name}'s KYC approved successfully`, type: 'success' });
   };
 
-  const handleReject = (name) => {
-    if (activeTab === 'brokers') {
-      setBrokerData(prev => prev.map(k => k.name === name ? { ...k, status: 'Rejected' } : k));
-    } else {
-      setDriverData(prev => prev.map(k => k.name === name ? { ...k, status: 'Rejected' } : k));
+  const handleReject = async (id, name, reason) => {
+    if (!reason.trim()) return showToast('Please provide a rejection reason', 'error');
+    setActionLoading(id + '_reject');
+    try {
+      const res = await api.patch(`/api/admin/kyc/${id}/reject`, { reason: reason.trim() }, getToken());
+      if (res.success) {
+        setData((prev) => prev.map((k) => k.id === id ? { ...k, status: 'Rejected', rejectionReason: reason.trim() } : k));
+        showToast(`${name}'s KYC rejected`);
+        setShowRejectBox(false);
+        setRejectReason('');
+        setSelectedKYC(null);
+      } else {
+        showToast(res.message || 'Failed to reject KYC', 'error');
+      }
+    } catch {
+      showToast('Network error — could not reject KYC', 'error');
+    } finally {
+      setActionLoading(null);
     }
-    setToast({ message: `${name}'s KYC rejected`, type: 'error' });
+  };
+
+  const openRejectFlow = (kyc) => {
+    setSelectedKYC(kyc);
+    setShowRejectBox(true);
+    setRejectReason('');
   };
 
   return (
@@ -88,6 +176,19 @@ export default function KYC() {
         </div>
       </div>
 
+      {error && (
+        <div className="card p-4 text-sm text-danger flex items-center gap-2">
+          <span>{error}</span>
+          <button onClick={fetchKyc} className="underline">Retry</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="card p-10 flex justify-center">
+          <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : (
+      <>
       {/* Broker KYC Table */}
       {activeTab === 'brokers' && (
         <div className="card overflow-hidden">
@@ -107,8 +208,10 @@ export default function KYC() {
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((kyc) => (
-                  <tr key={kyc.name}>
+                {paginated.length === 0 ? (
+                  <tr><td colSpan={9} className="text-center py-10 text-neutral-400 text-sm">No broker KYC submissions found</td></tr>
+                ) : paginated.map((kyc) => (
+                  <tr key={kyc.id}>
                     <td className="font-medium">{kyc.name}</td>
                     <td className="text-xs">{kyc.pan}</td>
                     <td className="text-xs">{kyc.aadhaar}</td>
@@ -124,10 +227,10 @@ export default function KYC() {
                         </button>
                         {kyc.status === 'Pending' && (
                           <>
-                            <button onClick={() => handleApprove(kyc.name)} className="p-1.5 text-tertiary bg-green-50 rounded-lg hover:bg-green-100 transition-colors" title="Approve">
+                            <button onClick={() => handleApprove(kyc.id, kyc.name)} disabled={actionLoading === kyc.id + '_verify'} className="p-1.5 text-tertiary bg-green-50 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-40" title="Approve">
                               <CheckCircle size={14} />
                             </button>
-                            <button onClick={() => handleReject(kyc.name)} className="p-1.5 text-danger bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title="Reject">
+                            <button onClick={() => openRejectFlow(kyc)} className="p-1.5 text-danger bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title="Reject">
                               <XCircle size={14} />
                             </button>
                           </>
@@ -165,23 +268,23 @@ export default function KYC() {
                   <th>Name</th>
                   <th>Driving License</th>
                   <th>Aadhaar</th>
-                  <th>Vehicle Docs</th>
+                  <th>Vehicle Reg.</th>
+                  <th>Vehicle Insurance</th>
                   <th>Submission</th>
                   <th>Status</th>
                   <th className="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((kyc) => (
-                  <tr key={kyc.name}>
+                {paginated.length === 0 ? (
+                  <tr><td colSpan={8} className="text-center py-10 text-neutral-400 text-sm">No driver KYC submissions found</td></tr>
+                ) : paginated.map((kyc) => (
+                  <tr key={kyc.id}>
                     <td className="font-medium">{kyc.name}</td>
                     <td className="text-xs whitespace-nowrap">{kyc.licenseNo}</td>
                     <td className="text-xs">{kyc.aadhaar}</td>
-                    <td>
-                      <Badge status={kyc.vehicleDocs ? 'Verified' : 'Pending'}>
-                        {kyc.vehicleDocs ? 'Submitted' : 'Missing'}
-                      </Badge>
-                    </td>
+                    <td className="text-xs whitespace-nowrap">{kyc.vehicleReg || <Badge status="Pending">Missing</Badge>}</td>
+                    <td className="text-xs whitespace-nowrap">{kyc.vehicleIns || <Badge status="Pending">Missing</Badge>}</td>
                     <td>{kyc.submissionDate}</td>
                     <td><Badge status={kyc.status} /></td>
                     <td className="text-center">
@@ -191,10 +294,10 @@ export default function KYC() {
                         </button>
                         {kyc.status === 'Pending' && (
                           <>
-                            <button onClick={() => handleApprove(kyc.name)} className="p-1.5 text-tertiary bg-green-50 rounded-lg hover:bg-green-100 transition-colors" title="Approve">
+                            <button onClick={() => handleApprove(kyc.id, kyc.name)} disabled={actionLoading === kyc.id + '_verify'} className="p-1.5 text-tertiary bg-green-50 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-40" title="Approve">
                               <CheckCircle size={14} />
                             </button>
-                            <button onClick={() => handleReject(kyc.name)} className="p-1.5 text-danger bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title="Reject">
+                            <button onClick={() => openRejectFlow(kyc)} className="p-1.5 text-danger bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title="Reject">
                               <XCircle size={14} />
                             </button>
                           </>
@@ -221,9 +324,11 @@ export default function KYC() {
           )}
         </div>
       )}
+      </>
+      )}
 
       {/* View Documents Modal */}
-      <Modal isOpen={!!selectedKYC} onClose={() => setSelectedKYC(null)} title="KYC Documents" size="md">
+      <Modal isOpen={!!selectedKYC} onClose={() => { setSelectedKYC(null); setShowRejectBox(false); setRejectReason(''); }} title="KYC Documents" size="md">
         {selectedKYC && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -249,7 +354,8 @@ export default function KYC() {
                 <>
                   <DocumentPlaceholder label="Driving License" />
                   <DocumentPlaceholder label="Aadhaar Card" />
-                  {selectedKYC.vehicleDocs && <DocumentPlaceholder label="Vehicle Documents" />}
+                  {selectedKYC.vehicleReg && <DocumentPlaceholder label="Vehicle Registration" />}
+                  {selectedKYC.vehicleIns && <DocumentPlaceholder label="Vehicle Insurance" />}
                 </>
               )}
             </div>
@@ -266,25 +372,58 @@ export default function KYC() {
                 <>
                   <div className="flex justify-between"><span className="text-neutral-500">License No.</span><span className="font-medium">{selectedKYC.licenseNo}</span></div>
                   <div className="flex justify-between"><span className="text-neutral-500">Aadhaar</span><span className="font-medium">{selectedKYC.aadhaar}</span></div>
-                  <div className="flex justify-between"><span className="text-neutral-500">Vehicle Docs</span><span className="font-medium">{selectedKYC.vehicleDocs ? 'Submitted' : 'Missing'}</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Vehicle Reg.</span><span className="font-medium">{selectedKYC.vehicleReg || 'Missing'}</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Vehicle Insurance</span><span className="font-medium">{selectedKYC.vehicleIns || 'Missing'}</span></div>
                 </>
               )}
               <div className="flex justify-between"><span className="text-neutral-500">Submission Date</span><span className="font-medium">{selectedKYC.submissionDate}</span></div>
             </div>
 
+            {selectedKYC.status === 'Rejected' && selectedKYC.rejectionReason && (
+              <p className="text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-red-700">
+                <span className="font-semibold">Rejection reason: </span>{selectedKYC.rejectionReason}
+              </p>
+            )}
+
             {selectedKYC.status === 'Pending' && (
-              <div className="flex gap-2">
-                <button onClick={() => { handleApprove(selectedKYC.name); setSelectedKYC(null); }} className="btn-success flex-1">
-                  <CheckCircle size={16} /> Approve
-                </button>
-                <button onClick={() => { handleReject(selectedKYC.name); setSelectedKYC(null); }} className="btn-danger flex-1">
-                  <XCircle size={16} /> Reject
-                </button>
-              </div>
+              <>
+                {showRejectBox && (
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="Reason for rejection..."
+                    rows={2}
+                    autoFocus
+                    className="w-full text-sm border border-neutral-200 rounded-lg px-3 py-2 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { handleApprove(selectedKYC.id, selectedKYC.name); setSelectedKYC(null); }}
+                    disabled={actionLoading === selectedKYC.id + '_verify'}
+                    className="btn-success flex-1 disabled:opacity-40"
+                  >
+                    <CheckCircle size={16} /> Approve
+                  </button>
+                  {!showRejectBox ? (
+                    <button onClick={() => setShowRejectBox(true)} className="btn-danger flex-1">
+                      <XCircle size={16} /> Reject
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleReject(selectedKYC.id, selectedKYC.name, rejectReason)}
+                      disabled={actionLoading === selectedKYC.id + '_reject'}
+                      className="btn-danger flex-1 disabled:opacity-40"
+                    >
+                      <XCircle size={16} /> Confirm Reject
+                    </button>
+                  )}
+                </div>
+              </>
             )}
 
             <div className="flex justify-end">
-              <button onClick={() => setSelectedKYC(null)} className="btn-secondary">Close</button>
+              <button onClick={() => { setSelectedKYC(null); setShowRejectBox(false); setRejectReason(''); }} className="btn-secondary">Close</button>
             </div>
           </div>
         )}
