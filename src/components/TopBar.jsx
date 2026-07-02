@@ -1,6 +1,7 @@
-import { Bell, Search, Menu, LogOut, ChevronDown, Settings, User } from 'lucide-react';
+import { Search, Menu, LogOut, ChevronDown, Settings, User } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import NotificationBell from './NotificationBell';
 
 export default function TopBar({ onMenuClick, sidebarCollapsed, onLogout, user }) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -46,10 +47,7 @@ export default function TopBar({ onMenuClick, sidebarCollapsed, onLogout, user }
       {/* Right */}
       <div className="flex items-center gap-2">
         {/* Notification bell */}
-        <button className="relative w-9 h-9 flex items-center justify-center rounded-xl hover:bg-neutral-100 text-neutral-500 transition-colors">
-          <Bell size={19} />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full ring-2 ring-white" />
-        </button>
+        <NotificationBell />
 
         <div className="w-px h-6 bg-neutral-200 mx-1" />
 

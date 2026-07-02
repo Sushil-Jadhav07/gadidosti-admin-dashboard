@@ -78,6 +78,8 @@ export default function Settings() {
     name: '',
     email: '',
     phone: '',
+    address: '',
+    company_name: '',
     role: 'Super Admin',
     joined: '',
   });
@@ -93,13 +95,15 @@ export default function Settings() {
       const token = getToken();
       if (!token) { setProfileLoading(false); return; }
       try {
-        const data = await api.get('/api/user/profile', token);
+        const data = await api.get('/api/users/profile', token);
         if (data.success) {
           const u = data.data.user;
           setProfile({
             name: u.name || '',
             email: u.email || '',
             phone: u.phone ? `+91 ${u.phone}` : '',
+            address: u.address || '',
+            company_name: u.company_name || '',
             role: u.role === 'admin' ? 'Super Admin' : u.role,
             joined: u.created_at
               ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -117,13 +121,18 @@ export default function Settings() {
     if (!token) return;
     setSaving(true);
     try {
-      const data = await api.put('/api/user/profile', { name: profile.name, email: profile.email }, token);
+      const data = await api.patch('/api/users/profile', {
+        name: profile.name,
+        email: profile.email,
+        address: profile.address,
+        company_name: profile.company_name,
+      }, token);
       if (data.success) {
         setToast({ message: 'Profile saved successfully', type: 'success' });
         // Update stored auth with new user data
         const stored = getStoredAuth();
         if (stored) {
-          stored.user = { ...stored.user, name: profile.name, email: profile.email };
+          stored.user = { ...stored.user, name: profile.name, email: profile.email, address: profile.address, company_name: profile.company_name };
           localStorage.setItem('ssk_admin_auth', JSON.stringify(stored));
         }
       } else {
@@ -150,7 +159,7 @@ export default function Settings() {
     if (!token) return;
     setSaving(true);
     try {
-      const data = await api.put('/api/user/change-password', {
+      const data = await api.patch('/api/users/change-password', {
         current_password: passwords.current,
         new_password: passwords.next,
       }, token);
@@ -287,6 +296,24 @@ export default function Settings() {
                             className="form-input pl-10 bg-neutral-50 text-neutral-400 cursor-not-allowed"
                           />
                         </div>
+                      </Field>
+                      <Field label="Company / Organization">
+                        <input
+                          type="text"
+                          value={profile.company_name}
+                          onChange={(e) => setProfile((p) => ({ ...p, company_name: e.target.value }))}
+                          placeholder="SSK Logistics"
+                          className="form-input"
+                        />
+                      </Field>
+                      <Field label="Office Address">
+                        <input
+                          type="text"
+                          value={profile.address}
+                          onChange={(e) => setProfile((p) => ({ ...p, address: e.target.value }))}
+                          placeholder="Head office address"
+                          className="form-input"
+                        />
                       </Field>
                     </div>
 
