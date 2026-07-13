@@ -92,4 +92,62 @@
     background-color: rgba(255,255,255,0.2);
     border-radius: 4px;
   }
+
+  /* Same thin scrollbar, but a visible thumb for light/white backgrounds (modals, cards) */
+  .scrollbar-thin-light {
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E1 transparent;
+  }
+  .scrollbar-thin-light::-webkit-scrollbar { width: 6px; }
+  .scrollbar-thin-light::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin-light::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 9999px;
+  }
+  .scrollbar-thin-light::-webkit-scrollbar-thumb:hover {
+    background-color: #94A3B8;
+  }
+
+  /* Colored progress-fill range slider — color/fill set per-instance via --slider-color / --slider-fill */
+  .price-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(to right,
+      var(--slider-color, #1976FF) var(--slider-fill, 0%),
+      #E2E8F0 var(--slider-fill, 0%));
+    outline: none;
+    cursor: pointer;
+  }
+  .price-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: var(--slider-color, #1976FF);
+    border: 3px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    cursor: pointer;
+  }
+  .price-slider::-moz-range-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: #E2E8F0;
+  }
+  .price-slider::-moz-range-progress {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--slider-color, #1976FF);
+  }
+  .price-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: var(--slider-color, #1976FF);
+    border: 3px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    cursor: pointer;
+  }
 }

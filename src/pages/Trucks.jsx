@@ -1,27 +1,120 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Eye, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
-import { trucks } from '../data/mockData';
+import Toast from '../components/Toast';
+import { api, getToken } from '../services/api';
+
+const STATUS_LABEL = { available: 'Available', on_trip: 'On Trip', maintenance: 'Under Maintenance' };
+const STATUS_OPTIONS = ['available', 'on_trip', 'maintenance'];
+
+function isInsuranceExpiring(dateStr) {
+  if (!dateStr) return false;
+  const expiry = new Date(dateStr);
+  const daysLeft = (expiry - new Date()) / (1000 * 60 * 60 * 24);
+  return daysLeft < 60;
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// GET /api/vehicles/trucks doesn't join a broker display name (only brokerId) —
+// fall back to a shortened id so the column still shows something meaningful.
+function shortId(id) {
+  return id ? `#${id.slice(0, 8)}` : '—';
+}
+
+function mapTruck(t) {
+  return {
+    id: t.id,
+    regNo: t.registration,
+    type: t.type || '—',
+    category: t.category,
+    make: t.make || '—',
+    year: t.year || '—',
+    capacity: t.capacity || '—',
+    broker: shortId(t.brokerId),
+    driver: t.driver || '—',
+    driverId: t.driverId,
+    lastTrip: t.lastTrip || '—',
+    insuranceExpiry: t.insuranceExpiry,
+    status: t.status,
+    statusLabel: STATUS_LABEL[t.status] || t.status,
+  };
+}
 
 export default function Trucks() {
+  const [trucks, setTrucks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTruck, setSelectedTruck] = useState(null);
+  const [statusDraft, setStatusDraft] = useState('');
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [toast, setToast] = useState(null);
   const itemsPerPage = 10;
+
+  const fetchTrucks = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get('/api/vehicles/trucks?limit=100', getToken());
+      if (res.success) {
+        setTrucks(res.data.trucks.map(mapTruck));
+      } else {
+        setError(res.message || 'Failed to load trucks');
+      }
+    } catch {
+      setError('Network error — could not load trucks');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTrucks(); }, [fetchTrucks]);
 
   const filtered = trucks.filter((t) =>
     !searchTerm ||
-    t.regNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.broker.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.driver.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.regNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.broker?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.driver?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+
+  const openTruck = (truck) => {
+    setSelectedTruck(truck);
+    setStatusDraft(truck.status);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedTruck || statusDraft === selectedTruck.status) return;
+    setSavingStatus(true);
+    try {
+      const res = await api.patch(`/api/vehicles/trucks/${selectedTruck.id}`, { status: statusDraft }, getToken());
+      if (res.success) {
+        const updated = mapTruck(res.data.truck);
+        setTrucks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+        setSelectedTruck(updated);
+        setToast({ message: `${updated.regNo} status updated to ${updated.statusLabel}`, type: 'success' });
+      } else {
+        setToast({ message: res.message || 'Failed to update truck status', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Network error — could not update truck status', type: 'error' });
+    } finally {
+      setSavingStatus(false);
+    }
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -43,6 +136,18 @@ export default function Trucks() {
         </div>
       </div>
 
+      {error && (
+        <div className="card p-4 text-sm text-danger flex items-center gap-2">
+          <span>{error}</span>
+          <button onClick={fetchTrucks} className="underline">Retry</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="card p-10 flex justify-center">
+          <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : (
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="data-table">
@@ -51,25 +156,33 @@ export default function Trucks() {
                 <th>Truck ID</th>
                 <th>Registration No.</th>
                 <th>Type</th>
+                <th>Make / Year</th>
                 <th>Broker</th>
                 <th>Driver Assigned</th>
+                <th>Last Trip</th>
+                <th>Insurance Expiry</th>
                 <th>Capacity</th>
                 <th>Status</th>
                 <th className="text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginated.map((truck) => (
+              {paginated.length === 0 ? (
+                <tr><td colSpan={11} className="text-center py-12 text-neutral-400">No data found.</td></tr>
+              ) : paginated.map((truck) => (
                 <tr key={truck.id}>
-                  <td className="font-medium text-neutral-800">{truck.id}</td>
+                  <td className="font-medium text-neutral-800">{shortId(truck.id)}</td>
                   <td className="font-medium whitespace-nowrap">{truck.regNo}</td>
                   <td>{truck.type}</td>
+                  <td className="whitespace-nowrap">{truck.make} <span className="text-neutral-400">· {truck.year}</span></td>
                   <td className="whitespace-nowrap">{truck.broker}</td>
                   <td>{truck.driver}</td>
+                  <td className="whitespace-nowrap text-neutral-500">{truck.lastTrip}</td>
+                  <td className={`whitespace-nowrap ${isInsuranceExpiring(truck.insuranceExpiry) ? 'text-danger font-semibold' : ''}`}>{formatDate(truck.insuranceExpiry)}</td>
                   <td>{truck.capacity}</td>
-                  <td><Badge status={truck.status} /></td>
+                  <td><Badge status={truck.statusLabel} /></td>
                   <td className="text-center">
-                    <button onClick={() => setSelectedTruck(truck)} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="View Details">
+                    <button onClick={() => openTruck(truck)} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="View Details">
                       <Eye size={14} />
                     </button>
                   </td>
@@ -92,6 +205,7 @@ export default function Trucks() {
           </div>
         )}
       </div>
+      )}
 
       <Modal isOpen={!!selectedTruck} onClose={() => setSelectedTruck(null)} title="Truck Details" size="md">
         {selectedTruck && (
@@ -102,23 +216,49 @@ export default function Trucks() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-secondary">{selectedTruck.regNo}</h3>
-                <Badge status={selectedTruck.status} />
+                <Badge status={selectedTruck.statusLabel} />
               </div>
             </div>
             <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-neutral-500">Truck ID</span><span className="font-medium">{selectedTruck.id}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-500">Truck ID</span><span className="font-medium">{shortId(selectedTruck.id)}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Registration Number</span><span className="font-medium">{selectedTruck.regNo}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Type</span><span className="font-medium">{selectedTruck.type}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-500">Make</span><span className="font-medium">{selectedTruck.make}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-500">Year</span><span className="font-medium">{selectedTruck.year}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Capacity</span><span className="font-medium">{selectedTruck.capacity}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Broker</span><span className="font-medium">{selectedTruck.broker}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Driver</span><span className="font-medium">{selectedTruck.driver}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-500">Last Trip</span><span className="font-medium">{selectedTruck.lastTrip}</span></div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Insurance Expiry</span>
+                <span className={`font-medium ${isInsuranceExpiring(selectedTruck.insuranceExpiry) ? 'text-danger' : ''}`}>{formatDate(selectedTruck.insuranceExpiry)}</span>
+              </div>
             </div>
+
+            <div>
+              <label className="form-label">Update Status</label>
+              <div className="flex items-center gap-2">
+                <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)} className="form-select">
+                  {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                </select>
+                <button
+                  onClick={handleUpdateStatus}
+                  disabled={savingStatus || statusDraft === selectedTruck.status}
+                  className="btn-primary whitespace-nowrap disabled:opacity-40"
+                >
+                  {savingStatus ? 'Saving...' : 'Update'}
+                </button>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2">
               <button onClick={() => setSelectedTruck(null)} className="btn-secondary">Close</button>
             </div>
           </div>
         )}
       </Modal>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
