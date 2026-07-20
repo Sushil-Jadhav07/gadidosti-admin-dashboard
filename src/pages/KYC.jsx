@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, CheckCircle, XCircle, ChevronLeft, ChevronRight, FileText, ShieldCheck } from 'lucide-react';
+import { Search, CheckCircle, XCircle, ChevronLeft, ChevronRight, FileText, ShieldCheck, Loader2, ImageOff } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
@@ -7,12 +7,53 @@ import { api, getToken } from '../services/api';
 
 const STATUS_LABEL = { submitted: 'Pending', verified: 'Verified', rejected: 'Rejected' };
 
-function DocumentPlaceholder({ label }) {
+// Only renders a box for documents that actually have an uploaded photo url — number-only
+// fields (GST, bank account, vehicle reg/insurance numbers etc.) never had a file to preview.
+function DocumentPreview({ label, url }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!url) {
+    return (
+      <div className="bg-neutral-100 border-2 border-dashed border-neutral-200 rounded-lg p-4 flex flex-col items-center justify-center text-center opacity-60">
+        <ImageOff size={20} className="text-neutral-400 mb-1" />
+        <span className="text-xs text-neutral-500">{label}</span>
+        <span className="text-[10px] text-neutral-400">Not uploaded</span>
+      </div>
+    );
+  }
+
+  const handleOpen = async () => {
+    if (blobUrl) { window.open(blobUrl, '_blank'); return; }
+    setLoading(true);
+    setError(false);
+    try {
+      const resolved = await api.getFileBlobUrl(url, getToken());
+      setBlobUrl(resolved);
+      window.open(resolved, '_blank');
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="bg-neutral-100 border-2 border-dashed border-neutral-200 rounded-lg p-4 flex flex-col items-center justify-center text-center hover:border-primary/30 transition-colors cursor-pointer">
-      <FileText size={20} className="text-neutral-400 mb-1" />
-      <span className="text-xs text-neutral-500">{label}</span>
-    </div>
+    <button
+      type="button"
+      onClick={handleOpen}
+      disabled={loading}
+      className="bg-white border-2 border-primary/20 rounded-lg p-4 flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-60 w-full"
+    >
+      {loading ? (
+        <Loader2 size={20} className="text-primary mb-1 animate-spin" />
+      ) : (
+        <FileText size={20} className="text-primary mb-1" />
+      )}
+      <span className="text-xs text-neutral-700 font-medium">{label}</span>
+      <span className="text-[10px] text-primary">{error ? 'Failed to load — retry' : 'View document'}</span>
+    </button>
   );
 }
 
@@ -23,7 +64,9 @@ function mapBroker(s) {
     id: s.user_id,
     name: s.name,
     pan: d.pan_number || '—',
+    panPhotoUrl: d.pan_photo_url || null,
     aadhaar: d.aadhaar_number || '—',
+    aadhaarPhotoUrl: d.aadhaar_photo_url || null,
     gst: d.gst_number || '—',
     bankAccount: d.bank_account_number || '—',
     businessReg: d.business_registration_number || null,
@@ -39,7 +82,9 @@ function mapDriver(s) {
     id: s.user_id,
     name: s.name,
     licenseNo: d.license_number || '—',
+    licensePhotoUrl: d.license_photo_url || null,
     aadhaar: d.aadhaar_number || '—',
+    aadhaarPhotoUrl: d.aadhaar_photo_url || null,
     vehicleReg: d.vehicle_registration_number || null,
     vehicleIns: d.vehicle_insurance_number || null,
     submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
@@ -344,18 +389,13 @@ export default function KYC() {
             <div className="grid grid-cols-2 gap-3">
               {activeTab === 'brokers' ? (
                 <>
-                  <DocumentPlaceholder label="PAN Card" />
-                  <DocumentPlaceholder label="Aadhaar Card" />
-                  <DocumentPlaceholder label="GST Certificate" />
-                  <DocumentPlaceholder label="Bank Statement" />
-                  {selectedKYC.businessReg && <DocumentPlaceholder label="Business Registration" />}
+                  <DocumentPreview label="PAN Card" url={selectedKYC.panPhotoUrl} />
+                  <DocumentPreview label="Aadhaar Card" url={selectedKYC.aadhaarPhotoUrl} />
                 </>
               ) : (
                 <>
-                  <DocumentPlaceholder label="Driving License" />
-                  <DocumentPlaceholder label="Aadhaar Card" />
-                  {selectedKYC.vehicleReg && <DocumentPlaceholder label="Vehicle Registration" />}
-                  {selectedKYC.vehicleIns && <DocumentPlaceholder label="Vehicle Insurance" />}
+                  <DocumentPreview label="Driving License" url={selectedKYC.licensePhotoUrl} />
+                  <DocumentPreview label="Aadhaar Card" url={selectedKYC.aadhaarPhotoUrl} />
                 </>
               )}
             </div>

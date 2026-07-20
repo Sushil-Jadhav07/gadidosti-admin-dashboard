@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Eye, PauseCircle, PlayCircle, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
+import { Search, Eye, PauseCircle, PlayCircle, ChevronLeft, ChevronRight, Building2, Phone } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
@@ -155,7 +155,13 @@ export default function Brokers() {
                 <tr key={broker.id}>
                   <td className="font-medium text-neutral-800">{shortId(broker.id)}</td>
                   <td className="font-medium">{broker.name}</td>
-                  <td className="whitespace-nowrap">{broker.phone}</td>
+                  <td className="whitespace-nowrap">
+                    {broker.phone ? (
+                      <a href={`tel:${broker.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-primary hover:underline">
+                        <Phone size={12} /> {broker.phone}
+                      </a>
+                    ) : '—'}
+                  </td>
                   <td className="text-right">{broker.fleetSize}</td>
                   <td className="text-right">{broker.activeTrucks}</td>
                   <td className="text-right font-medium">&#8377;{broker.totalEarnings.toLocaleString('en-IN')}</td>
@@ -214,7 +220,7 @@ export default function Brokers() {
             </div>
             <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-neutral-500">Broker ID</span><span className="font-medium">{shortId(selectedBroker.id)}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Phone</span><span className="font-medium">{selectedBroker.phone}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-500">Phone</span>{selectedBroker.phone ? <a href={`tel:${selectedBroker.phone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedBroker.phone}</a> : <span className="font-medium">—</span>}</div>
               <div className="flex justify-between"><span className="text-neutral-500">Fleet Size</span><span className="font-medium">{selectedBroker.fleetSize} trucks</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Active Trucks</span><span className="font-medium">{selectedBroker.activeTrucks} trucks</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Total Earnings</span><span className="font-medium">&#8377;{selectedBroker.totalEarnings.toLocaleString('en-IN')}</span></div>

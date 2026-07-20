@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
-  CarFront, IndianRupee, AlertTriangle, ShieldCheck, BarChart3,
+  CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
   Settings, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
@@ -27,9 +27,19 @@ const sections = [
     ],
   },
   {
+    // Both are "something went wrong, admin needs to act" queues — Incidents are
+    // driver-reported problems on an active trip, Disputes are client/broker complaints
+    // raised on a booking after the fact. Grouped together since they're the same kind
+    // of screen even though they're backed by different tables.
+    label: 'Issues & Disputes',
+    items: [
+      { path: '/incidents', label: 'Incidents', subLabel: 'Reported by drivers', icon: AlertTriangle },
+      { path: '/disputes', label: 'Disputes', subLabel: 'Raised by broker/client', icon: Flag },
+    ],
+  },
+  {
     label: 'Compliance',
     items: [
-      { path: '/disputes', label: 'Disputes', icon: AlertTriangle },
       { path: '/kyc', label: 'KYC', icon: ShieldCheck },
     ],
   },
@@ -87,12 +97,21 @@ export default function Sidebar({ collapsed, onToggle }) {
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    title={collapsed ? item.label : undefined}
-                    className={`flex items-center gap-3 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2.5'} ${active ? 'bg-primary text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/8'}`}
+                    title={collapsed ? `${item.label}${item.subLabel ? ` — ${item.subLabel}` : ''}` : undefined}
+                    className={`flex items-center gap-3 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center px-0 py-3' : item.subLabel ? 'px-3 py-2' : 'px-3 py-2.5'} ${active ? 'bg-primary text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/8'}`}
                   >
                     <Icon size={collapsed ? 20 : 18} className="flex-shrink-0" />
-                    {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-                    {!collapsed && active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/60" />}
+                    {!collapsed && (
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium leading-tight">{item.label}</span>
+                        {item.subLabel && (
+                          <span className={`block text-[10px] leading-tight ${active ? 'text-white/70' : 'text-white/35'}`}>
+                            {item.subLabel}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {!collapsed && active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/60 flex-shrink-0" />}
                   </NavLink>
                 );
               })}

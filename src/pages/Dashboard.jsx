@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Area, AreaChart,
 } from "recharts";
-import { ClipboardList, Truck, IndianRupee, CarFront } from "lucide-react";
+import { ClipboardList, Truck, IndianRupee, CarFront, AlertTriangle } from "lucide-react";
 import StatCard from "../components/StatCard";
 import Badge from "../components/Badge";
 import { api, getToken } from "../services/api";
@@ -126,6 +126,30 @@ export default function Dashboard() {
           <span className="text-sm font-medium text-neutral-700">Live Dashboard</span>
         </div>
       </div>
+
+      {stats.stalePendingBookings > 0 && (
+        <button
+          onClick={() => navigate("/bookings")}
+          className="w-full flex items-center gap-3 bg-danger/5 border border-danger/20 rounded-xl px-4 py-3 text-left hover:bg-danger/10 transition-colors"
+        >
+          <AlertTriangle size={18} className="text-danger flex-shrink-0" />
+          <span className="text-sm text-secondary">
+            <span className="font-semibold">{stats.stalePendingBookings}</span> booking{stats.stalePendingBookings === 1 ? "" : "s"} {stats.stalePendingBookings === 1 ? "has" : "have"} been pending with no broker response for over 2 hours.
+          </span>
+        </button>
+      )}
+
+      {stats.openIncidents > 0 && (
+        <button
+          onClick={() => navigate("/incidents")}
+          className="w-full flex items-center gap-3 bg-warning/5 border border-warning/20 rounded-xl px-4 py-3 text-left hover:bg-warning/10 transition-colors"
+        >
+          <AlertTriangle size={18} className="text-warning flex-shrink-0" />
+          <span className="text-sm text-secondary">
+            <span className="font-semibold">{stats.openIncidents}</span> open trip incident{stats.openIncidents === 1 ? "" : "s"} need{stats.openIncidents === 1 ? "s" : ""} attention.
+          </span>
+        </button>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Total Bookings" value={stats.totalBookings || 0} icon={ClipboardList} change={stats.bookingsChange || 0} changeType="positive" variant="primary" />

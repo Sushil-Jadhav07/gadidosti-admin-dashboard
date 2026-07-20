@@ -10,6 +10,7 @@ import Drivers from './pages/Drivers';
 import Trucks from './pages/Trucks';
 import Pricing from './pages/Pricing';
 import Disputes from './pages/Disputes';
+import Incidents from './pages/Incidents';
 import KYC from './pages/KYC';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
@@ -92,6 +93,7 @@ export default function App() {
             <Route path="/trucks"    element={<Trucks />} />
             <Route path="/pricing"   element={<Pricing />} />
             <Route path="/disputes"  element={<Disputes />} />
+            <Route path="/incidents" element={<Incidents />} />
             <Route path="/kyc"       element={<KYC />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings"  element={<Settings />} />

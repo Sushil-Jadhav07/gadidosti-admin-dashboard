@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Search, Eye, ChevronLeft, ChevronRight, CheckCircle2, Circle, Truck,
-  User, Building2, MapPin, Package, XCircle,
+  User, Building2, MapPin, Package, XCircle, Camera, Phone, MessageCircle,
 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import ChatWindow from '../components/ChatWindow';
 import { api, getToken } from '../services/api';
 
 const STATUS_MAP = {
@@ -60,6 +61,15 @@ function shortId(id) {
 // prefer that over the raw UUID, matching what every other GadiDost frontend already shows.
 function bookingRef(booking) {
   return booking?.bookingNumber || shortId(booking?.id);
+}
+
+function PhoneLink({ phone }) {
+  if (!phone) return null;
+  return (
+    <a href={`tel:${phone}`} className="text-primary hover:underline flex items-center gap-1 justify-end">
+      <Phone size={12} /> {phone}
+    </a>
+  );
 }
 
 function InfoCard({ icon: Icon, title, rows }) {
@@ -147,10 +157,28 @@ function PricingBreakdown({ pricing, amount }) {
 }
 
 function BookingDetailModal({ booking, onClose }) {
+  const [loadingPod, setLoadingPod] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  // This component stays mounted (parent always renders it, just with booking=null when
+  // closed) — reset the chat panel whenever a different booking is opened.
+  useEffect(() => { setShowChat(false); }, [booking?.id]);
   if (!booking) return null;
   const statusLabel = STATUS_MAP[booking.status] || booking.status;
   const category = (booking.truckCategory || '').toLowerCase();
   const categoryColor = CATEGORY_COLOR[category] || '#1976FF';
+
+  const viewProofOfDelivery = async () => {
+    if (!booking.podUrl || loadingPod) return;
+    setLoadingPod(true);
+    try {
+      const blobUrl = await api.getFileBlobUrl(booking.podUrl, getToken());
+      window.open(blobUrl, '_blank');
+    } catch {
+      // Best-effort — no toast wired into this modal; the button re-enables on failure.
+    } finally {
+      setLoadingPod(false);
+    }
+  };
 
   return (
     <Modal isOpen={!!booking} onClose={onClose} title={`Booking Details — ${bookingRef(booking)}`} size="xl">
@@ -185,7 +213,7 @@ function BookingDetailModal({ booking, onClose }) {
             title="Client Information"
             rows={[
               ['Name', booking.client],
-              ['Phone', booking.clientPhone],
+              ['Phone', <PhoneLink phone={booking.clientPhone} />],
               ['Email', booking.clientEmail],
             ]}
           />
@@ -194,8 +222,9 @@ function BookingDetailModal({ booking, onClose }) {
             title="Broker Information"
             rows={[
               ['Broker', booking.broker],
+              ['Broker Phone', <PhoneLink phone={booking.brokerPhone} />],
               ['Driver', booking.driver?.name],
-              ['Driver Phone', booking.driverPhone || booking.driver?.phone],
+              ['Driver Phone', <PhoneLink phone={booking.driverPhone || booking.driver?.phone} />],
               ['Truck Reg.', booking.truckReg],
             ]}
           />
@@ -221,6 +250,31 @@ function BookingDetailModal({ booking, onClose }) {
         </div>
 
         <PricingBreakdown pricing={booking.pricing} amount={booking.amount} />
+
+        {booking.podUrl && (
+          <button
+            onClick={viewProofOfDelivery}
+            disabled={loadingPod}
+            className="w-full flex items-center gap-2.5 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors disabled:opacity-60"
+          >
+            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <Camera size={16} />
+            </div>
+            <span className="text-sm font-medium text-neutral-700">{loadingPod ? 'Loading...' : 'View Proof of Delivery'}</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => setShowChat((v) => !v)}
+          className="w-full flex items-center gap-2.5 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors"
+        >
+          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+            <MessageCircle size={16} />
+          </div>
+          <span className="text-sm font-medium text-neutral-700">{showChat ? 'Hide Chat' : 'View Chat (read-only)'}</span>
+        </button>
+
+        {showChat && <ChatWindow bookingId={booking.id} />}
       </div>
     </Modal>
   );

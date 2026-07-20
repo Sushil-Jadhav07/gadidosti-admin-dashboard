@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Eye, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
+import { Search, Eye, ChevronLeft, ChevronRight, Truck, Plus } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
+import BrokerPicker from '../components/BrokerPicker';
 import { api, getToken } from '../services/api';
 
 const STATUS_LABEL = { available: 'Available', on_trip: 'On Trip', maintenance: 'Under Maintenance' };
 const STATUS_OPTIONS = ['available', 'on_trip', 'maintenance'];
+const TRUCK_CATEGORIES = ['small', 'medium', 'large', 'part'];
+const REGISTRATION_REGEX = /^[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{1,4}$/i;
+const EMPTY_REGISTER_FORM = { brokerId: '', registration: '', category: 'small', capacity: '', make: '', year: '', insuranceExpiry: '' };
 
 function isInsuranceExpiring(dateStr) {
   if (!dateStr) return false;
@@ -58,6 +62,58 @@ export default function Trucks() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [toast, setToast] = useState(null);
   const itemsPerPage = 10;
+
+  const [showRegister, setShowRegister] = useState(false);
+  const [registerForm, setRegisterForm] = useState(EMPTY_REGISTER_FORM);
+  const [registerError, setRegisterError] = useState('');
+  const [registering, setRegistering] = useState(false);
+
+  const openRegister = () => {
+    setRegisterForm(EMPTY_REGISTER_FORM);
+    setRegisterError('');
+    setShowRegister(true);
+  };
+
+  const handleRegisterTruck = async () => {
+    if (!registerForm.brokerId) {
+      setRegisterError('Select which broker this truck will belong to.');
+      return;
+    }
+    if (!registerForm.registration.trim()) {
+      setRegisterError('Registration number is required.');
+      return;
+    }
+    if (!REGISTRATION_REGEX.test(registerForm.registration.trim())) {
+      setRegisterError('Registration number looks invalid, e.g. MH-12-AB-1234.');
+      return;
+    }
+    if (!registerForm.capacity.trim()) {
+      setRegisterError('Capacity is required.');
+      return;
+    }
+    setRegisterError('');
+    setRegistering(true);
+    try {
+      const res = await api.post('/api/vehicles/trucks', {
+        broker_id: registerForm.brokerId,
+        registration: registerForm.registration.trim(),
+        type: registerForm.category,
+        category: registerForm.category,
+        capacity: registerForm.capacity.trim(),
+        make: registerForm.make.trim() || undefined,
+        year: Number(registerForm.year) || undefined,
+        insurance_expiry: registerForm.insuranceExpiry || undefined,
+      }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to register truck');
+      setToast({ message: `${registerForm.registration.trim()} registered successfully`, type: 'success' });
+      setShowRegister(false);
+      fetchTrucks();
+    } catch (err) {
+      setRegisterError(err.message || 'Failed to register truck.');
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   const fetchTrucks = useCallback(async () => {
     setLoading(true);
@@ -118,9 +174,12 @@ export default function Trucks() {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-poppins font-bold text-secondary">Trucks</h1>
-        <p className="text-sm text-neutral-500 mt-1">Manage fleet and track truck availability</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-poppins font-bold text-secondary">Trucks</h1>
+          <p className="text-sm text-neutral-500 mt-1">Manage fleet and track truck availability</p>
+        </div>
+        <button onClick={openRegister} className="btn-primary flex-shrink-0"><Plus size={16} /> Register Truck</button>
       </div>
 
       <div className="card p-4">
@@ -256,6 +315,53 @@ export default function Trucks() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal isOpen={showRegister} onClose={() => setShowRegister(false)} title="Register Truck" size="lg">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="form-label">Broker *</label>
+            <BrokerPicker value={registerForm.brokerId} onChange={(id) => setRegisterForm((f) => ({ ...f, brokerId: id }))} />
+            <p className="text-[11px] text-neutral-400 mt-1">The truck will be added to this broker's fleet.</p>
+          </div>
+          <div className="col-span-2">
+            <label className="form-label">Registration Number</label>
+            <input
+              type="text"
+              value={registerForm.registration}
+              onChange={(event) => setRegisterForm((current) => ({ ...current, registration: event.target.value }))}
+              className="form-input"
+              placeholder="MH-12-AB-1234"
+            />
+          </div>
+          <div>
+            <label className="form-label">Truck Type</label>
+            <select value={registerForm.category} onChange={(event) => setRegisterForm((current) => ({ ...current, category: event.target.value }))} className="form-select">
+              {TRUCK_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat[0].toUpperCase() + cat.slice(1)}</option>)}
+            </select>
+          </div>
+          {[
+            ['capacity', 'Capacity'],
+            ['make', 'Make / Model'],
+            ['year', 'Year'],
+            ['insuranceExpiry', 'Insurance Expiry'],
+          ].map(([key, label]) => (
+            <div key={key}>
+              <label className="form-label">{label}</label>
+              <input
+                type={key === 'insuranceExpiry' ? 'date' : 'text'}
+                value={registerForm[key]}
+                onChange={(event) => setRegisterForm((current) => ({ ...current, [key]: event.target.value }))}
+                className="form-input"
+              />
+            </div>
+          ))}
+          {registerError && <div className="col-span-2 text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{registerError}</div>}
+          <div className="col-span-2 flex gap-3 pt-1">
+            <button onClick={() => setShowRegister(false)} className="flex-1 btn-secondary">Cancel</button>
+            <button onClick={handleRegisterTruck} disabled={registering} className="flex-1 btn-primary disabled:opacity-60">{registering ? 'Registering...' : 'Register Truck'}</button>
+          </div>
+        </div>
       </Modal>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Search, Eye, CheckCircle, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Search, Eye, CheckCircle, ChevronLeft, ChevronRight, AlertTriangle, Phone } from "lucide-react";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Toast from "../components/Toast";
@@ -207,13 +207,37 @@ export default function Disputes() {
             </div>
             <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
               <div><span className="text-neutral-500">Description</span><p className="mt-1 text-neutral-700">{selectedDispute.description}</p></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Raised By</span><span className="font-medium">{selectedDispute.raisedByName || selectedDispute.raisedBy}</span></div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Raised By</span>
+                <span className="font-medium flex items-center gap-1.5">
+                  {selectedDispute.raisedByName || selectedDispute.raisedBy}
+                  {selectedDispute.raisedByPhone && <a href={`tel:${selectedDispute.raisedByPhone}`} className="text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.raisedByPhone}</a>}
+                </span>
+              </div>
               <div className="flex justify-between"><span className="text-neutral-500">Date</span><span className="font-medium">{new Date(selectedDispute.date).toLocaleString("en-IN")}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Status</span><Badge status={STATUS_LABELS[selectedDispute.status] || selectedDispute.status} /></div>
               {selectedDispute.resolution && (
                 <div><span className="text-neutral-500">Resolution</span><p className="mt-1 text-neutral-700">{selectedDispute.resolution}</p></div>
               )}
             </div>
+
+            {/* Every party on the booking — not just whoever raised the dispute — so admin can
+                call any of them without hopping over to Bookings/Drivers/Brokers mid-dispute. */}
+            {(selectedDispute.clientPhone || selectedDispute.brokerPhone || selectedDispute.driverPhone) && (
+              <div className="bg-neutral-50 rounded-lg p-4 space-y-2.5 text-sm">
+                <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Booking Contacts</h4>
+                {selectedDispute.clientPhone && (
+                  <div className="flex justify-between"><span className="text-neutral-500">Client{selectedDispute.clientName ? ` (${selectedDispute.clientName})` : ""}</span><a href={`tel:${selectedDispute.clientPhone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.clientPhone}</a></div>
+                )}
+                {selectedDispute.brokerPhone && (
+                  <div className="flex justify-between"><span className="text-neutral-500">Broker{selectedDispute.brokerName ? ` (${selectedDispute.brokerName})` : ""}</span><a href={`tel:${selectedDispute.brokerPhone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.brokerPhone}</a></div>
+                )}
+                {selectedDispute.driverPhone && (
+                  <div className="flex justify-between"><span className="text-neutral-500">Driver{selectedDispute.driverName ? ` (${selectedDispute.driverName})` : ""}</span><a href={`tel:${selectedDispute.driverPhone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.driverPhone}</a></div>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
               <button onClick={() => setSelectedDispute(null)} className="btn-secondary">Close</button>
             </div>

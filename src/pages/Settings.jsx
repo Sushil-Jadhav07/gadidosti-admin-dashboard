@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Save, Globe, Bell, Shield, User, Lock,
-  Camera, Eye, EyeOff, Mail, Phone, IndianRupee,
+  Camera, Eye, EyeOff, Mail, Phone, IndianRupee, UserPlus,
 } from "lucide-react";
 import Toast from "../components/Toast";
 import { api, getStoredAuth, getToken } from "../services/api";
@@ -21,7 +21,10 @@ const tabs = [
   { id: "commission", label: "Commission", icon: IndianRupee },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "security", label: "Security", icon: Shield },
+  { id: "team", label: "Team", icon: UserPlus },
 ];
+
+const EMPTY_NEW_ADMIN = { name: "", phone: "", email: "", password: "" };
 
 function Toggle({ enabled, onChange, label, description }) {
   return (
@@ -92,6 +95,10 @@ export default function Settings() {
   });
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
+  const [newAdmin, setNewAdmin] = useState(EMPTY_NEW_ADMIN);
+  const [newAdminErrors, setNewAdminErrors] = useState({});
+  const [showNewAdminPw, setShowNewAdminPw] = useState(false);
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
 
   const loadToken = useCallback(() => getToken(), []);
 
@@ -242,6 +249,45 @@ export default function Settings() {
       setToast({ message: "Network error. Please try again.", type: "error" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const validateNewAdmin = () => {
+    const next = {};
+    if (!newAdmin.name.trim()) next.name = "Name is required.";
+    if (!/^\d{10}$/.test(newAdmin.phone.replace(/\D/g, ""))) next.phone = "Enter a valid 10-digit phone number.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newAdmin.email.trim())) next.email = "Enter a valid email address.";
+    if (newAdmin.password.length < 8) next.password = "Password must be at least 8 characters.";
+    setNewAdminErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleCreateAdmin = async () => {
+    if (!validateNewAdmin()) return;
+    const token = loadToken();
+    if (!token) return;
+
+    setCreatingAdmin(true);
+    try {
+      const data = await api.post("/api/auth/admin/register", {
+        name: newAdmin.name.trim(),
+        phone: newAdmin.phone.replace(/\D/g, ""),
+        email: newAdmin.email.trim(),
+        password: newAdmin.password,
+      }, token);
+
+      if (!data.success) {
+        setToast({ message: data.message || "Failed to create admin account", type: "error" });
+        return;
+      }
+
+      setToast({ message: `Admin account created for ${newAdmin.name.trim()}`, type: "success" });
+      setNewAdmin(EMPTY_NEW_ADMIN);
+      setNewAdminErrors({});
+    } catch {
+      setToast({ message: "Network error. Please try again.", type: "error" });
+    } finally {
+      setCreatingAdmin(false);
     }
   };
 
@@ -487,6 +533,68 @@ export default function Settings() {
                     </span>
                   </div>
                   <p className="text-xs text-neutral-400 mt-3">Only one session is active at a time. Logging in from a new device will end this session.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "team" && (
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Create Admin Account</h3>
+              </div>
+              <div className="p-6 space-y-5">
+                <p className="text-xs text-neutral-500 -mt-1">
+                  Admin accounts are created immediately active and verified — no OTP step. The new admin logs in with their email and the password set here.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Full Name">
+                    <input type="text" value={newAdmin.name} onChange={(event) => setNewAdmin((current) => ({ ...current, name: event.target.value }))} placeholder="Jane Doe" className="form-input" />
+                    {newAdminErrors.name && <p className="text-xs text-danger mt-1">{newAdminErrors.name}</p>}
+                  </Field>
+                  <Field label="Phone Number">
+                    <div className="relative">
+                      <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                      <input
+                        type="tel"
+                        value={newAdmin.phone}
+                        onChange={(event) => setNewAdmin((current) => ({ ...current, phone: event.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                        placeholder="10-digit phone number"
+                        className="form-input pl-10"
+                      />
+                    </div>
+                    {newAdminErrors.phone && <p className="text-xs text-danger mt-1">{newAdminErrors.phone}</p>}
+                  </Field>
+                  <Field label="Email Address">
+                    <div className="relative">
+                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                      <input type="email" value={newAdmin.email} onChange={(event) => setNewAdmin((current) => ({ ...current, email: event.target.value }))} placeholder="admin@ssklogistics.in" className="form-input pl-10" />
+                    </div>
+                    {newAdminErrors.email && <p className="text-xs text-danger mt-1">{newAdminErrors.email}</p>}
+                  </Field>
+                  <Field label="Password">
+                    <div className="relative">
+                      <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                      <input
+                        type={showNewAdminPw ? "text" : "password"}
+                        value={newAdmin.password}
+                        onChange={(event) => setNewAdmin((current) => ({ ...current, password: event.target.value }))}
+                        placeholder="Minimum 8 characters"
+                        className="form-input pl-10 pr-10"
+                      />
+                      <button type="button" onClick={() => setShowNewAdminPw((current) => !current)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors">
+                        {showNewAdminPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {newAdminErrors.password && <p className="text-xs text-danger mt-1">{newAdminErrors.password}</p>}
+                  </Field>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-neutral-100">
+                  <button onClick={handleCreateAdmin} disabled={creatingAdmin} className="btn-primary">
+                    {creatingAdmin ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating...</> : <><UserPlus size={15} />Create Admin</>}
+                  </button>
                 </div>
               </div>
             </div>
