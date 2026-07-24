@@ -4,12 +4,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Area, AreaChart,
 } from "recharts";
-import { ClipboardList, Truck, IndianRupee, CarFront, AlertTriangle } from "lucide-react";
+import { ClipboardList, Truck, IndianRupee, CarFront, AlertTriangle, MapPin } from "lucide-react";
 import StatCard from "../components/StatCard";
 import Badge from "../components/Badge";
+import MapView from "../components/MapView";
 import { api, getToken } from "../services/api";
 
 const PIE_COLORS = ["#1976FF", "#17D86B", "#F59E0B", "#041E42"];
+
+// Every non-terminal trip status — same set Bookings.jsx's status tabs cover between
+// "Accepted" and "Delivered", excluding the request-only "Requested" stage (no trip row
+// exists yet for a booking that's still just pending broker acceptance).
+const ACTIVE_TRIP_STATUSES = "confirmed,en_route_pickup,picked_up,in_transit";
 
 function ChartTooltip({ active, payload, label, prefix = "" }) {
   if (!active || !payload?.length) return null;
@@ -40,6 +46,9 @@ export default function Dashboard() {
   const [analytics, setAnalytics] = useState({});
   const [bookings, setBookings] = useState([]);
   const [trucks, setTrucks] = useState([]);
+  const [activeTrips, setActiveTrips] = useState([]);
+  const [tripsLoading, setTripsLoading] = useState(true);
+  const [tripsError, setTripsError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,10 +66,43 @@ export default function Dashboard() {
       setBookings(bookingsRes.data?.bookings || []);
       setTrucks(trucksRes.data?.trucks || []);
       setLoading(false);
+
+      // Separate call, not blocking the rest of the dashboard on it — the map card has its
+      // own loading/error state below.
+      try {
+        const tripsRes = await api.get(`/api/trips?status=${ACTIVE_TRIP_STATUSES}&limit=50`, token);
+        setActiveTrips(tripsRes.data?.trips || []);
+      } catch {
+        setTripsError(true);
+      } finally {
+        setTripsLoading(false);
+      }
     };
 
     load().catch(() => setLoading(false));
   }, []);
+
+  const activeTripRoutes = useMemo(() => activeTrips.map((trip, i) => ({
+    id: trip.id,
+    origin: trip.pickup?.lat != null && trip.pickup?.lng != null
+      ? { lat: Number(trip.pickup.lat), lng: Number(trip.pickup.lng) }
+      : trip.pickup?.location,
+    destination: trip.drop?.lat != null && trip.drop?.lng != null
+      ? { lat: Number(trip.drop.lat), lng: Number(trip.drop.lng) }
+      : trip.drop?.location,
+    originLabel: trip.pickup?.location,
+    destinationLabel: trip.drop?.location,
+    color: PIE_COLORS[i % PIE_COLORS.length],
+  })), [activeTrips]);
+
+  const activeTripMarkers = useMemo(() => activeTrips
+    .filter((trip) => trip.currentLocation?.lat != null && trip.currentLocation?.lng != null)
+    .map((trip) => ({
+      id: `${trip.id}-live`,
+      position: { lat: Number(trip.currentLocation.lat), lng: Number(trip.currentLocation.lng) },
+      color: "red",
+      title: `${trip.bookingNumber || "Trip"} — live position`,
+    })), [activeTrips]);
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
@@ -156,6 +198,24 @@ export default function Dashboard() {
         <StatCard title="Active Trips" value={stats.activeTrips || 0} icon={Truck} change={stats.activeTripsChange || 0} changeType="positive" variant="warning" />
         <StatCard title="Total Revenue" value={stats.totalRevenue || 0} icon={IndianRupee} change={stats.revenueChange || 0} changeType="positive" variant="success" prefix="₹" />
         <StatCard title="Registered Trucks" value={stats.registeredTrucks || 0} icon={CarFront} change={stats.trucksChange || 0} changeType="positive" variant="secondary" />
+      </div>
+
+      <div className="card">
+        <SectionHeader title="Active Trips" action="View all bookings →" onAction={() => navigate("/bookings")} />
+        <div className="p-5">
+          {tripsLoading ? (
+            <div className="skeleton h-[360px] rounded-xl" />
+          ) : tripsError ? (
+            <div className="h-[360px] flex items-center justify-center text-danger text-sm">Failed to load active trips.</div>
+          ) : !activeTrips.length ? (
+            <div className="h-[360px] flex flex-col items-center justify-center text-neutral-400 text-sm">
+              <MapPin size={28} className="mb-2 opacity-30" />
+              No trips currently active
+            </div>
+          ) : (
+            <MapView routes={activeTripRoutes} markers={activeTripMarkers} height="360px" className="rounded-xl overflow-hidden" />
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
