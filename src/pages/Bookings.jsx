@@ -395,7 +395,7 @@ export default function Bookings() {
                 <tr key={booking.id}>
                   <td className="font-medium text-neutral-800 whitespace-nowrap">{bookingRef(booking)}</td>
                   <td>{booking.client}</td>
-                  <td className="whitespace-nowrap">{booking.pickup} → {booking.drop}</td>
+                  <td className="max-w-[220px] truncate" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>
                   <td>{booking.truckType || booking.truckCategory || '-'}</td>
                   <td className="whitespace-nowrap">{booking.broker || '-'}</td>
                   <td className="whitespace-nowrap">{booking.driver?.name || '-'}</td>
