@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Dashboard from './pages/Dashboard';
@@ -22,8 +22,8 @@ export default function App() {
   const [authData, setAuthData] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ssk_admin_auth')); } catch { return null; }
   });
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
 
   const isLoggedIn = !!authData;
 
@@ -50,16 +50,6 @@ export default function App() {
     setAuthData(null);
   };
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) setSidebarCollapsed(true);
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed);
   const toggleMobile = () => setMobileOpen(!mobileOpen);
 
   if (!isLoggedIn) {
@@ -69,20 +59,20 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F0F4FA]">
       <div className="hidden lg:block">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <Sidebar hoverExpand onHoverChange={setSidebarHovered} />
       </div>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)}></div>
           <div className="absolute left-0 top-0 h-full">
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
+            <Sidebar forceExpanded />
           </div>
         </div>
       )}
 
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-        <TopBar onMenuClick={toggleMobile} sidebarCollapsed={sidebarCollapsed} onLogout={handleLogout} user={authData?.user} />
+      <div className={`transition-all duration-300 ${sidebarHovered ? 'lg:ml-64' : 'lg:ml-16'}`}>
+        <TopBar onMenuClick={toggleMobile} onLogout={handleLogout} user={authData?.user} />
         <main className="px-4 pt-4 pb-8 lg:px-6 lg:pt-5 lg:pb-10 min-h-[calc(100vh-4rem)]">
           <Routes>
             <Route path="/"          element={<Dashboard />} />

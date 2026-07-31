@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
 
-export default function TopBar({ onMenuClick, sidebarCollapsed, onLogout, user }) {
+export default function TopBar({ onMenuClick, onLogout, user }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const dropRef = useRef(null);

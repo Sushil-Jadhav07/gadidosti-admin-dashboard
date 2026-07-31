@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
-  Settings, ChevronLeft, ChevronRight,
+  Settings,
 } from 'lucide-react';
 
 const sections = [
@@ -52,30 +53,37 @@ const sections = [
   },
 ];
 
-export default function Sidebar({ collapsed, onToggle }) {
+export default function Sidebar({ hoverExpand = false, forceExpanded = false, onHoverChange }) {
   const location = useLocation();
+  const [hovered, setHovered] = useState(false);
+
+  const collapsed = hoverExpand ? !hovered : !forceExpanded;
 
   const isActive = (path) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
+  const setHover = (value) => {
+    if (!hoverExpand) return;
+    setHovered(value);
+    onHoverChange?.(value);
+  };
+
   return (
-    <aside className={`fixed left-0 top-0 h-screen bg-secondary z-40 transition-all duration-300 flex flex-col ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      className={`fixed left-0 top-0 h-screen bg-secondary z-40 transition-all duration-300 flex flex-col ${collapsed ? 'w-16' : 'w-64'}`}
+    >
       {/* Logo */}
-      <div className={`flex items-center h-16 border-b border-white/10 flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'px-4 justify-between'}`}>
-        {!collapsed && (
-          <>
-            <div className="bg-white rounded-xl px-2.5 py-1.5">
-              <img src="/gadidost-logo.png" alt="GadiDost" className="h-7 w-auto object-contain" />
-            </div>
-            <button onClick={onToggle} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors">
-              <ChevronLeft size={16} />
-            </button>
-          </>
-        )}
-        {collapsed && (
-          <button onClick={onToggle} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden">
+      <div className={`flex items-center h-16 border-b border-white/10 flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
+        {!collapsed ? (
+          <div className="bg-white rounded-xl px-2.5 py-1.5">
+            <img src="/gadidost-logo.png" alt="GadiDost" className="h-7 w-auto object-contain" />
+          </div>
+        ) : (
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden">
             <img src="/gadidost-logo.png" alt="GD" className="h-6 w-auto object-contain object-left" style={{ minWidth: 56, marginLeft: -4 }} />
-          </button>
+          </div>
         )}
       </div>
 
