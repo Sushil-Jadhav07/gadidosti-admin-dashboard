@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Search, Eye, ChevronLeft, ChevronRight, CheckCircle2, Circle, Truck,
   User, Building2, MapPin, Package, XCircle, Camera, Phone, MessageCircle,
+  Trash2, AlertTriangle, Undo2,
 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import ChatWindow from '../components/ChatWindow';
+import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 
 const STATUS_MAP = {
@@ -61,6 +63,19 @@ function shortId(id) {
 // prefer that over the raw UUID, matching what every other GadiDost frontend already shows.
 function bookingRef(booking) {
   return booking?.bookingNumber || shortId(booking?.id);
+}
+
+// A broker/driver "deleting" a booking only hides it from their own list — the row still
+// exists (deletedAt/deletedBy set) until an admin hard-deletes it via DELETE /api/bookings/:id.
+// This tells admins apart from a booking nobody has touched.
+function DeletedBadge({ deletedAt, className = '' }) {
+  if (!deletedAt) return null;
+  const date = new Date(deletedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 ${className}`}>
+      <Undo2 size={11} /> Removed by broker/driver on {date} — still recoverable, hard-delete to remove permanently
+    </span>
+  );
 }
 
 function PhoneLink({ phone }) {
@@ -156,7 +171,7 @@ function PricingBreakdown({ pricing, amount }) {
   );
 }
 
-function BookingDetailModal({ booking, onClose }) {
+function BookingDetailModal({ booking, onClose, onRequestDelete }) {
   const [loadingPod, setLoadingPod] = useState(false);
   const [showChat, setShowChat] = useState(false);
   // This component stays mounted (parent always renders it, just with booking=null when
@@ -190,6 +205,8 @@ function BookingDetailModal({ booking, onClose }) {
           </div>
           <Badge status={statusLabel} />
         </div>
+
+        <DeletedBadge deletedAt={booking.deletedAt} />
 
         <div className="bg-neutral-50 rounded-2xl p-4">
           <StatusTimeline status={booking.status} />
@@ -275,6 +292,96 @@ function BookingDetailModal({ booking, onClose }) {
         </button>
 
         {showChat && <ChatWindow bookingId={booking.id} />}
+
+        <div className="border border-danger/20 bg-danger/5 rounded-2xl p-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-danger flex items-center gap-1.5"><AlertTriangle size={14} /> Danger Zone</p>
+            <p className="text-xs text-neutral-500 mt-1">Permanently delete this booking and everything tied to it. This cannot be undone.</p>
+          </div>
+          <button
+            onClick={() => onRequestDelete(booking)}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-danger rounded-lg hover:bg-danger/90 transition-colors"
+          >
+            <Trash2 size={13} /> Delete Booking
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+const CASCADE_ITEMS = [
+  'The booking timeline',
+  'Job requests',
+  'Driver requests',
+  'The trip record',
+  'Chat thread and messages',
+  'Any payment, dispute, and settlement rows tied to it',
+];
+
+// Two-step confirm, per spec: a warning screen first, then a step that only
+// unlocks the delete button once the admin types the exact booking number.
+// This is a real, irreversible, cascading delete — the friction is intentional.
+function DeleteBookingModal({ booking, onClose, onConfirm, deleting }) {
+  const [step, setStep] = useState(1);
+  const [confirmText, setConfirmText] = useState('');
+
+  useEffect(() => {
+    if (booking) { setStep(1); setConfirmText(''); }
+  }, [booking]);
+
+  if (!booking) return null;
+  const ref = bookingRef(booking);
+  const matches = confirmText.trim() === ref;
+
+  return (
+    <Modal isOpen={!!booking} onClose={onClose} title="Delete Booking Permanently" size="sm">
+      <div className="space-y-4">
+        <div className="flex items-start gap-2.5 bg-danger/5 border border-danger/20 rounded-xl p-3">
+          <AlertTriangle size={18} className="text-danger flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-danger font-medium">
+            This is a real, irreversible delete. There is no undo.
+          </p>
+        </div>
+
+        {step === 1 ? (
+          <>
+            <p className="text-sm text-neutral-600">
+              Deleting <span className="font-semibold text-neutral-800">{ref}</span> will permanently remove:
+            </p>
+            <ul className="text-sm text-neutral-600 list-disc pl-5 space-y-1">
+              {CASCADE_ITEMS.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={onClose} className="btn-secondary">Cancel</button>
+              <button onClick={() => setStep(2)} className="btn-danger">Are you sure?</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-neutral-600">
+              Type the booking number <span className="font-mono font-semibold text-neutral-800">{ref}</span> to confirm.
+            </p>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(event) => setConfirmText(event.target.value)}
+              placeholder={ref}
+              autoFocus
+              className="form-input font-mono"
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setStep(1)} className="btn-secondary">Back</button>
+              <button
+                onClick={() => onConfirm(booking)}
+                disabled={!matches || deleting}
+                className="btn-danger disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );
@@ -286,10 +393,38 @@ export default function Bookings() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const itemsPerPage = 10;
+
+  const showToast = (message, type = 'success') => setToast({ message, type });
+
+  const handleRequestDelete = (booking) => {
+    setSelectedBooking(null);
+    setDeleteTarget(booking);
+  };
+
+  const handleConfirmDelete = async (booking) => {
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/bookings/${booking.id}`, getToken());
+      if (res.success) {
+        setBookings((prev) => prev.filter((b) => b.id !== booking.id));
+        setDeleteTarget(null);
+        showToast(`${bookingRef(booking)} permanently deleted`);
+      } else {
+        showToast(res.message || 'Failed to delete booking', 'error');
+      }
+    } catch {
+      showToast('Network error — could not delete booking', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
@@ -393,7 +528,12 @@ export default function Bookings() {
             <tbody>
               {paginatedBookings.map((booking) => (
                 <tr key={booking.id}>
-                  <td className="font-medium text-neutral-800 whitespace-nowrap">{bookingRef(booking)}</td>
+                  <td className="font-medium text-neutral-800 whitespace-nowrap">
+                    {bookingRef(booking)}
+                    {booking.deletedAt && (
+                      <span className="block mt-1"><DeletedBadge deletedAt={booking.deletedAt} className="whitespace-normal max-w-[220px]" /></span>
+                    )}
+                  </td>
                   <td>{booking.client}</td>
                   <td className="max-w-[220px] truncate" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>
                   <td>{booking.truckType || booking.truckCategory || '-'}</td>
@@ -426,7 +566,18 @@ export default function Bookings() {
       </div>
       )}
 
-      <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+      <BookingDetailModal
+        booking={selectedBooking}
+        onClose={() => setSelectedBooking(null)}
+        onRequestDelete={handleRequestDelete}
+      />
+      <DeleteBookingModal
+        booking={deleteTarget}
+        onClose={() => (deleting ? null : setDeleteTarget(null))}
+        onConfirm={handleConfirmDelete}
+        deleting={deleting}
+      />
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
