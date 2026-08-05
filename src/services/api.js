@@ -27,7 +27,7 @@ export const api = {
   get:    (path, token)       => request('GET',    path, null, token),
   put:    (path, body, token) => request('PUT',    path, body, token),
   patch:  (path, body, token) => request('PATCH',  path, body, token),
-  delete: (path, token)       => request('DELETE', path, null, token),
+  delete: (path, token, body) => request('DELETE', path, body, token),
   getFileBlobUrl,
 };
 

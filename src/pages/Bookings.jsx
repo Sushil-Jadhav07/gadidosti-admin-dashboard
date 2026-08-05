@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search, Eye, ChevronLeft, ChevronRight, CheckCircle2, Circle, Truck,
   User, Building2, MapPin, Package, XCircle, Camera, Phone, MessageCircle,
@@ -399,6 +400,7 @@ export default function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
   const itemsPerPage = 10;
 
   const showToast = (message, type = 'success') => setToast({ message, type });
@@ -447,6 +449,17 @@ export default function Bookings() {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
   useEffect(() => { setCurrentPage(1); }, [statusFilter, truckTypeFilter, searchTerm]);
+
+  // Deep link from a push notification tap (?bookingId=...) — see
+  // firebase-messaging-sw.js's notificationclick handler and App.jsx's
+  // foreground-toast click, both of which navigate here the same way.
+  useEffect(() => {
+    const bookingId = searchParams.get('bookingId');
+    if (!bookingId || bookings.length === 0) return;
+    const match = bookings.find((b) => b.id === bookingId);
+    if (match) setSelectedBooking(match);
+    setSearchParams((params) => { params.delete('bookingId'); return params; }, { replace: true });
+  }, [searchParams, bookings, setSearchParams]);
 
   const filteredBookings = useMemo(() => bookings.filter((booking) => {
     const matchTruckType = truckTypeFilter === 'All Types' ||
