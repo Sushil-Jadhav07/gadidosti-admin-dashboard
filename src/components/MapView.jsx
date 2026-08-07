@@ -63,7 +63,7 @@ function RouteRenderer({ route, onResolved }) {
 // trip when a full route line is needed) and markers (plain pins, e.g. a trip's live position)
 // as props, so multiple trips can render on the same map without each page reimplementing map
 // plumbing. Loading/error states reuse this app's existing skeleton/card conventions.
-export default function MapView({ routes = [], markers = [], height = "400px", className = "", zoom }) {
+export default function MapView({ routes = [], markers = [], height = "400px", className = "", zoom, onMarkerClick }) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: GOOGLE_MAPS_SCRIPT_ID,
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
@@ -136,7 +136,14 @@ export default function MapView({ routes = [], markers = [], height = "400px", c
       options={MAP_OPTIONS}
     >
       {allMarkers.map((m) => (
-        <Marker key={m.id} position={m.position} icon={{ url: MARKER_ICON(m.color) }} title={m.title} label={m.label} />
+        <Marker
+          key={m.id}
+          position={m.position}
+          icon={{ url: MARKER_ICON(m.color) }}
+          title={m.title}
+          label={m.label}
+          onClick={onMarkerClick ? () => onMarkerClick(m.id) : undefined}
+        />
       ))}
       {routes.map((route) => (
         <RouteRenderer key={route.id} route={route} onResolved={handleResolved} />

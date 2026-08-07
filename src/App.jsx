@@ -15,6 +15,8 @@ import Incidents from './pages/Incidents';
 import KYC from './pages/KYC';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Tracking from './pages/Tracking';
+import TrackingDetail from './pages/TrackingDetail';
 import Login from './pages/Login';
 import { api } from './services/api';
 import { requestFcmToken, onForegroundMessage } from './lib/firebase';
@@ -141,6 +143,8 @@ export default function App() {
             <Route path="/brokers"   element={<Brokers />} />
             <Route path="/drivers"   element={<Drivers />} />
             <Route path="/trucks"    element={<Trucks />} />
+            <Route path="/tracking"        element={<Tracking />} />
+            <Route path="/tracking/:imei"  element={<TrackingDetail />} />
             <Route path="/pricing"   element={<Pricing />} />
             <Route path="/disputes"  element={<Disputes />} />
             <Route path="/incidents" element={<Incidents />} />

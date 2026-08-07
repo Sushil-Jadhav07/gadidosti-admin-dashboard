@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
-  Settings,
+  Settings, Radar,
 } from 'lucide-react';
 
 const sections = [
@@ -17,6 +17,7 @@ const sections = [
       { path: '/bookings', label: 'Bookings', icon: ClipboardList },
       { path: '/drivers', label: 'Drivers', icon: CarFront },
       { path: '/trucks', label: 'Trucks', icon: Truck },
+      { path: '/tracking', label: 'Live Tracking', icon: Radar },
     ],
   },
   {
