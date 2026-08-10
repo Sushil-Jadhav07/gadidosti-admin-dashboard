@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Eye, ChevronLeft, ChevronRight, List, Map as MapIcon, Gauge } from 'lucide-react';
+import { Search, Eye, ChevronLeft, ChevronRight, List, Map as MapIcon, Gauge, History } from 'lucide-react';
 import Badge from '../components/Badge';
 import MapView from '../components/MapView';
 import { api, getToken } from '../services/api';
+import { buildTruckIcon } from '../lib/truckIcon';
 
 const POLL_INTERVAL_MS = 15000;
 
@@ -26,6 +27,7 @@ export default function Tracking() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [tab, setTab] = useState('list');
+  const [cachedFallback, setCachedFallback] = useState(false);
   const itemsPerPage = 10;
 
   const fetchDevices = useCallback(async ({ silent } = {}) => {
@@ -35,6 +37,7 @@ export default function Tracking() {
       const res = await api.get('/api/tracking/devices', getToken());
       if (res.success) {
         setDevices(res.data.devices || []);
+        setCachedFallback(res.data.source === 'cached');
         setError('');
       } else if (!silent) {
         setError(res.message || 'Failed to load tracker devices');
@@ -68,8 +71,8 @@ export default function Tracking() {
     .map((d) => ({
       id: d.deviceImei,
       position: { lat: Number(d.latitude), lng: Number(d.longitude) },
-      color: d.status === 'online' ? 'green' : 'red',
-      title: d.name,
+      iconUrl: buildTruckIcon(d.course),
+      title: d.source === 'cached' ? `${d.name} (last seen)` : d.name,
     }));
 
   const openDevice = (device) => navigate(`/tracking/${device.deviceImei}`);
@@ -115,6 +118,13 @@ export default function Tracking() {
         </div>
       )}
 
+      {!error && cachedFallback && (
+        <div className="card p-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 flex items-center gap-2">
+          <History size={16} className="flex-shrink-0" />
+          <span>Live tracking is unavailable right now — showing each device's last known position.</span>
+        </div>
+      )}
+
       {loading ? (
         <div className="card p-10 flex justify-center">
           <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -148,7 +158,10 @@ export default function Tracking() {
                     <td><Badge status={statusLabel(device.status)} /></td>
                     <td className="whitespace-nowrap flex items-center gap-1"><Gauge size={13} className="text-neutral-400" />{device.speed ?? '—'} km/hr</td>
                     <td>{device.ignition === true ? 'On' : device.ignition === false ? 'Off' : '—'}</td>
-                    <td className="whitespace-nowrap text-neutral-500">{formatDateTime(device.lastUpdate)}</td>
+                    <td className="whitespace-nowrap text-neutral-500">
+                      {formatDateTime(device.lastUpdate)}
+                      {device.source === 'cached' && <span className="block text-[10px] text-amber-600 font-semibold">last seen</span>}
+                    </td>
                     <td className="text-center">
                       <button onClick={() => openDevice(device)} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="View Details">
                         <Eye size={14} />

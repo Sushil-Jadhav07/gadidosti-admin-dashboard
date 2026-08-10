@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Radar } from 'lucide-react';
+import { ArrowLeft, Radar, History } from 'lucide-react';
 import Badge from '../components/Badge';
 import MapView from '../components/MapView';
 import { api, getToken } from '../services/api';
+import { buildTruckIcon } from '../lib/truckIcon';
 
 const POLL_INTERVAL_MS = 15000;
 
@@ -72,7 +73,7 @@ export default function TrackingDetail() {
   }, [fetchDevice]);
 
   const marker = device && device.latitude != null && device.longitude != null
-    ? [{ id: device.deviceImei, position: { lat: Number(device.latitude), lng: Number(device.longitude) }, color: device.status === 'online' ? 'green' : 'red', title: device.name }]
+    ? [{ id: device.deviceImei, position: { lat: Number(device.latitude), lng: Number(device.longitude) }, iconUrl: buildTruckIcon(device.course), title: device.name }]
     : [];
 
   return (
@@ -106,6 +107,13 @@ export default function TrackingDetail() {
               </div>
             </div>
           </div>
+
+          {device.source === 'cached' && (
+            <div className="card p-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 flex items-center gap-2">
+              <History size={16} className="flex-shrink-0" />
+              <span>Live tracking is unavailable right now — showing the last known position{device.lastSeenAt ? `, from ${formatDateTime(device.lastSeenAt)}` : ''}.</span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card p-2 overflow-hidden">
