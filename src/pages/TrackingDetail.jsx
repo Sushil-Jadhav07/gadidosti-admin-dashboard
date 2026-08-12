@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Radar, History } from 'lucide-react';
+import { ArrowLeft, History } from 'lucide-react';
 import Badge from '../components/Badge';
 import MapView from '../components/MapView';
 import { api, getToken } from '../services/api';
 import { buildTruckIcon } from '../lib/truckIcon';
 
 const POLL_INTERVAL_MS = 15000;
+const TRUCK_IMAGE = '/truck/truck-marker.png';
 
 function statusLabel(status) {
   return status === 'online' ? 'Available' : 'Offline';
@@ -19,25 +20,103 @@ function formatDateTime(value) {
   return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const FIELDS = [
-  ['deviceId', 'Device ID'],
-  ['name', 'Tracker Name'],
-  ['deviceImei', 'Vehicle IMEI'],
-  ['type', 'Vehicle Type'],
-  ['phone', 'Tracker Phone'],
-  ['speed', 'Speed (km/hr)'],
-  ['course', 'Heading (degrees)'],
-  ['totalDistance', 'Total Distance'],
-  ['ignition', 'Ignition'],
-  ['alarm', 'Alarm'],
-  ['deviceFixTime', 'Last GPS Fix'],
-  ['lastUpdate', 'Last Server Update'],
+// Vendor sends enum-ish values as camelCase ("lowBattery") or snake_case
+// ("In_Motion") depending on the field — normalize both into "Low Battery" / "In Motion".
+function humanize(value) {
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
+// Bolt GPS reports distance in meters — raw values like 20300806.61 aren't
+// readable, so every distance-ish field is shown in km instead.
+function formatKm(value) {
+  return `${(Number(value) / 1000).toLocaleString('en-IN', { maximumFractionDigits: 2 })} km`;
+}
+
+function formatYesNo(value) {
+  return value === true || value === 'true' || value === 1 || value === '1' ? 'Yes' : 'No';
+}
+
+const FIELD_GROUPS = [
+  {
+    title: 'Identity',
+    fields: [
+      ['deviceId', 'Device ID'],
+      ['name', 'Tracker Name'],
+      ['deviceImei', 'Vehicle IMEI'],
+      ['type', 'Vehicle Type'],
+      ['phone', 'Tracker Phone'],
+      ['status', 'Connection Status'],
+      ['vehicle_status', 'Vehicle Status'],
+    ],
+  },
+  {
+    title: 'Motion',
+    fields: [
+      ['speed', 'Speed (km/hr)'],
+      ['course', 'Heading (degrees)'],
+      ['ignition', 'Ignition'],
+      ['armed', 'Armed'],
+      ['valid', 'GPS Fix Valid'],
+    ],
+  },
+  {
+    title: 'Power & Sensors',
+    fields: [
+      ['batteryLevel', 'Battery Level'],
+      ['external_power', 'External Power'],
+      ['ac', 'AC'],
+      ['fuel', 'Fuel'],
+      ['soc', 'State of Charge'],
+      ['temperature', 'Temperature'],
+      ['alarm', 'Alarm'],
+    ],
+  },
+  {
+    title: 'Distance & Location',
+    fields: [
+      ['totalDistance', 'Total Distance'],
+      ['daily_distance', 'Daily Distance'],
+      ['prevOdometer', 'Previous Odometer'],
+      ['latitude', 'Latitude'],
+      ['longitude', 'Longitude'],
+    ],
+  },
+  {
+    title: 'History & Meta',
+    fields: [
+      ['harshAccelerationHistory', 'Harsh Acceleration Events'],
+      ['harshBrakingHistory', 'Harsh Braking Events'],
+      ['region', 'Region'],
+      ['dealer', 'Dealer'],
+      ['posId', 'Position ID'],
+      ['deviceFixTime', 'Last GPS Fix'],
+      ['deviceTime', 'Device Time'],
+      ['lastUpdate', 'Last Server Update'],
+    ],
+  },
 ];
 
+const KM_FIELDS = new Set(['totalDistance', 'daily_distance', 'prevOdometer']);
+const YES_NO_FIELDS = new Set(['armed', 'valid']);
+const HUMANIZED_FIELDS = new Set(['alarm', 'vehicle_status']);
+const DATE_FIELDS = new Set(['lastUpdate', 'deviceFixTime', 'deviceTime']);
+const HISTORY_FIELDS = new Set(['harshAccelerationHistory', 'harshBrakingHistory']);
+
 function formatFieldValue(key, value) {
+  if (HISTORY_FIELDS.has(key)) return Array.isArray(value) && value.length ? `${value.length} event${value.length === 1 ? '' : 's'}` : 'None';
   if (value == null || value === '') return '—';
-  if (key === 'ignition') return value === true ? 'On' : value === false ? 'Off' : '—';
-  if (key === 'lastUpdate' || key === 'deviceFixTime') return formatDateTime(value);
+  if (key === 'ignition') return value === true || value === 'true' ? 'On' : value === false || value === 'false' ? 'Off' : '—';
+  if (YES_NO_FIELDS.has(key)) return formatYesNo(value);
+  if (DATE_FIELDS.has(key)) return formatDateTime(value);
+  if (KM_FIELDS.has(key)) return formatKm(value);
+  if (key === 'batteryLevel') return `${value}%`;
+  if (key === 'latitude' || key === 'longitude') return Number(value).toFixed(6);
+  if (key === 'status') return statusLabel(value);
+  if (HUMANIZED_FIELDS.has(key)) return humanize(value);
   return String(value);
 }
 
@@ -54,7 +133,11 @@ export default function TrackingDetail() {
     try {
       const res = await api.get(`/api/tracking/devices/imei/${imei}`, getToken());
       if (res.success) {
-        setDevice(res.data.device);
+        // The endpoint wraps the device in an array (`data.device: [ {...} ]`) even
+        // though it's always a single device for a given IMEI — unwrap it here so the
+        // rest of the component can keep treating `device` as a plain object.
+        const raw = res.data.device;
+        setDevice(Array.isArray(raw) ? raw[0] || null : raw);
         setError('');
       } else if (!silent) {
         setError(res.message || 'Device not found');
@@ -96,8 +179,8 @@ export default function TrackingDetail() {
       ) : device ? (
         <>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Radar size={24} className="text-primary" />
+            <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <img src={TRUCK_IMAGE} alt="" className="w-11 h-11 object-contain" />
             </div>
             <div>
               <h1 className="text-2xl font-poppins font-bold text-secondary">{device.name || 'Unnamed device'}</h1>
@@ -120,26 +203,40 @@ export default function TrackingDetail() {
               {marker.length ? (
                 <MapView markers={marker} height="480px" />
               ) : (
-                <div className="flex items-center justify-center bg-neutral-50 rounded-xl" style={{ height: '480px' }}>
+                <div className="flex flex-col items-center justify-center gap-3 bg-neutral-50 rounded-xl" style={{ height: '480px' }}>
+                  <img src={TRUCK_IMAGE} alt="" className="w-24 h-24 object-contain opacity-50" />
                   <p className="text-sm text-neutral-500">No location reported yet for this device.</p>
                 </div>
               )}
             </div>
 
-            <div className="card p-4">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-3">Device Details</p>
-              <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
-                {FIELDS.map(([key, label]) => (
-                  <div key={key} className="flex justify-between gap-3">
-                    <span className="text-neutral-500">{label}</span>
-                    <span className="font-medium text-right">{formatFieldValue(key, device[key])}</span>
+            <div className="card p-4 space-y-5">
+              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide">Device Details</p>
+              {FIELD_GROUPS.map((group) => (
+                <div key={group.title}>
+                  <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-2">{group.title}</p>
+                  <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
+                    {group.fields.map(([key, label]) => (
+                      <div key={key} className="flex justify-between gap-3">
+                        <span className="text-neutral-500">{label}</span>
+                        <span className="font-medium text-right">{formatFieldValue(key, device[key])}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         </>
-      ) : null}
+      ) : (
+        // Shouldn't normally happen (a failed/empty fetch sets `error` above instead) — but
+        // rendering nothing here previously meant the whole page looked silently blank with no
+        // way to tell what went wrong. Always show something actionable instead.
+        <div className="card p-10 flex flex-col items-center justify-center gap-3 text-center">
+          <p className="text-sm text-neutral-500">Couldn't load this device's details.</p>
+          <button onClick={() => fetchDevice()} className="text-sm text-primary underline">Retry</button>
+        </div>
+      )}
     </div>
   );
 }
