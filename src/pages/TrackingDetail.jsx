@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, History } from 'lucide-react';
+import { ArrowLeft, History, Gauge, Compass, Fuel, BatteryFull } from 'lucide-react';
 import Badge from '../components/Badge';
 import MapView from '../components/MapView';
 import { api, getToken } from '../services/api';
@@ -40,6 +40,9 @@ function formatYesNo(value) {
   return value === true || value === 'true' || value === 1 || value === '1' ? 'Yes' : 'No';
 }
 
+// Compact grid of small tiles instead of tall stacked key/value rows — the same data used to
+// take 5 separate full-width cards, each several hundred px tall, forcing a lot of scrolling
+// just to see fields most devices don't even report anyway (a lot of these come back empty).
 const FIELD_GROUPS = [
   {
     title: 'Identity',
@@ -120,6 +123,22 @@ function formatFieldValue(key, value) {
   return String(value);
 }
 
+// Top-of-page highlights so the most-checked values (speed, ignition, fuel, last update) are
+// visible immediately without scrolling into the full field grid below.
+function QuickStat({ icon: Icon, label, value }) {
+  return (
+    <div className="card p-3 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <Icon size={16} className="text-primary" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-neutral-400 leading-none">{label}</p>
+        <p className="text-sm font-semibold text-secondary mt-1 truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function TrackingDetail() {
   const { imei } = useParams();
   const navigate = useNavigate();
@@ -198,28 +217,39 @@ export default function TrackingDetail() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="card p-2 overflow-hidden">
-              {marker.length ? (
-                <MapView markers={marker} height="480px" />
-              ) : (
-                <div className="flex flex-col items-center justify-center gap-3 bg-neutral-50 rounded-xl" style={{ height: '480px' }}>
-                  <img src={TRUCK_IMAGE} alt="" className="w-24 h-24 object-contain opacity-50" />
-                  <p className="text-sm text-neutral-500">No location reported yet for this device.</p>
-                </div>
-              )}
-            </div>
+          {/* Quick stats — the four fields people actually check first, no scrolling needed */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <QuickStat icon={Gauge} label="Speed" value={device.speed != null ? `${device.speed} km/hr` : '—'} />
+            <QuickStat icon={Compass} label="Heading" value={device.course != null ? `${device.course}°` : '—'} />
+            <QuickStat icon={Fuel} label="Ignition" value={formatFieldValue('ignition', device.ignition)} />
+            <QuickStat icon={BatteryFull} label="Last Update" value={formatDateTime(device.lastUpdate)} />
+          </div>
 
-            <div className="card p-4 space-y-5">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide">Device Details</p>
+          {/* Map — full width, modest height, so it doesn't push the details far down the page */}
+          <div className="card p-2 overflow-hidden">
+            {marker.length ? (
+              <MapView markers={marker} height="360px" />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 bg-neutral-50 rounded-xl" style={{ height: '360px' }}>
+                <img src={TRUCK_IMAGE} alt="" className="w-20 h-20 object-contain opacity-50" />
+                <p className="text-sm text-neutral-500">No location reported yet for this device.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Full details — compact tile grid instead of tall stacked lists, grouped under a
+              small section label so it's still scannable, not a wall of numbers. */}
+          <div className="card p-4">
+            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-4">Device Details</p>
+            <div className="space-y-5">
               {FIELD_GROUPS.map((group) => (
                 <div key={group.title}>
                   <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-2">{group.title}</p>
-                  <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                     {group.fields.map(([key, label]) => (
-                      <div key={key} className="flex justify-between gap-3">
-                        <span className="text-neutral-500">{label}</span>
-                        <span className="font-medium text-right">{formatFieldValue(key, device[key])}</span>
+                      <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">
+                        <p className="text-[10px] text-neutral-400 leading-none truncate">{label}</p>
+                        <p className="text-sm font-medium text-secondary mt-1.5 truncate">{formatFieldValue(key, device[key])}</p>
                       </div>
                     ))}
                   </div>

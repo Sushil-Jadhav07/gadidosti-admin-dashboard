@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import Toast from '../components/Toast';
 import BrokerPicker from '../components/BrokerPicker';
 import { api, getToken } from '../services/api';
+import { TRUCK_IMAGES } from '../lib/truckImages';
 
 const STATUS_LABEL = { available: 'Available', on_trip: 'On Trip', maintenance: 'Under Maintenance' };
 const STATUS_OPTIONS = ['available', 'on_trip', 'maintenance'];
@@ -232,7 +233,18 @@ export default function Trucks() {
                 <tr key={truck.id}>
                   <td className="font-medium text-neutral-800">{shortId(truck.id)}</td>
                   <td className="font-medium whitespace-nowrap">{truck.regNo}</td>
-                  <td>{truck.type}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0 p-0.5">
+                        {TRUCK_IMAGES[truck.category] ? (
+                          <img src={TRUCK_IMAGES[truck.category]} alt={truck.category} className="w-full h-full object-contain" />
+                        ) : (
+                          <Truck size={13} className="text-neutral-300" />
+                        )}
+                      </div>
+                      {truck.type}
+                    </div>
+                  </td>
                   <td className="whitespace-nowrap">{truck.make} <span className="text-neutral-400">· {truck.year}</span></td>
                   <td className="whitespace-nowrap">{truck.broker}</td>
                   <td>{truck.driver}</td>
@@ -270,8 +282,12 @@ export default function Trucks() {
         {selectedTruck && (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
-                <Truck size={24} className="text-primary" />
+              <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
+                {TRUCK_IMAGES[selectedTruck.category] ? (
+                  <img src={TRUCK_IMAGES[selectedTruck.category]} alt={selectedTruck.category} className="w-11 h-11 object-contain" />
+                ) : (
+                  <Truck size={24} className="text-primary" />
+                )}
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-secondary">{selectedTruck.regNo}</h3>
