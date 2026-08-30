@@ -1,36 +1,52 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell, Legend,
-} from "recharts";
-import { TrendingUp, ClipboardList, IndianRupee, Users } from "lucide-react";
-import { api, getToken } from "../services/api";
+  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
+} from 'recharts';
+import { TrendingUp, ClipboardList, IndianRupee, Users, CircleDollarSign } from 'lucide-react';
+import StatCard from '../components/StatCard';
+import { api, getToken } from '../services/api';
 
-const COLORS = ["#1976FF", "#17D86B", "#F59E0B", "#8B5CF6", "#EF4444"];
+const COLORS = ['#166534', '#17D86B', '#F59E0B', '#0D9488', '#64748B'];
 
-function CustomTooltip({ active, payload, label, prefix = "" }) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white px-3 py-2 rounded-lg shadow-dropdown border border-neutral-200 text-sm">
-        <p className="font-medium text-neutral-700">{label}</p>
-        <p className="text-primary font-semibold">
-          {prefix}{payload[0].value?.toLocaleString("en-IN")}
-        </p>
-      </div>
-    );
-  }
-  return null;
+function money(value) {
+  return `₹${Number(value || 0).toLocaleString('en-IN')}`;
 }
 
-function KPITooltip({ active, payload }) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white px-2 py-1 rounded shadow-dropdown border border-neutral-200 text-xs">
-        <span className="text-primary font-semibold">{payload[0].value}%</span>
+function shortMoney(value) {
+  const amount = Number(value || 0);
+  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`;
+  if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+  if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
+  return `₹${amount}`;
+}
+
+function ChartTooltip({ active, payload, label, prefix = '' }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-white px-3.5 py-2.5 shadow-dropdown text-sm">
+      <p className="text-xs text-neutral-400 mb-1">{label}</p>
+      {payload.map((entry) => (
+        <p key={entry.dataKey} className="font-semibold text-secondary flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          {prefix}{Number(entry.value || 0).toLocaleString('en-IN')}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function SectionHeader({ eyebrow, title, description, metric }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+      <div>
+        {eyebrow && <p className="text-[11px] uppercase tracking-[0.18em] text-neutral-400 font-semibold">{eyebrow}</p>}
+        <h3 className="text-base font-poppins font-semibold text-secondary mt-1">{title}</h3>
+        {description && <p className="text-sm text-neutral-500 mt-1">{description}</p>}
       </div>
-    );
-  }
-  return null;
+      {metric && <div className="text-sm font-semibold text-primary">{metric}</div>}
+    </div>
+  );
 }
 
 export default function Analytics() {
@@ -42,8 +58,8 @@ export default function Analytics() {
     const load = async () => {
       const token = getToken();
       const [analyticsRes, statsRes] = await Promise.all([
-        api.get("/api/analytics/admin", token),
-        api.get("/api/admin/dashboard", token),
+        api.get('/api/analytics/admin', token),
+        api.get('/api/admin/dashboard', token),
       ]);
 
       setAnalytics(analyticsRes.data || {});
@@ -90,30 +106,44 @@ export default function Analytics() {
       const date = new Date(start);
       date.setDate(start.getDate() + index);
       return {
-        month: date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        label: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
         rate: value,
       };
     });
   }, [analytics]);
 
+  const totalRevenue = useMemo(
+    () => (analytics.revenueOverMonths || []).reduce((sum, item) => sum + Number(item.revenue || 0), 0),
+    [analytics]
+  );
+
+  const averageRevenuePerBroker = useMemo(() => {
+    const brokers = analytics.fleetUtilization || [];
+    return Math.round(totalRevenue / Math.max(1, brokers.length));
+  }, [analytics, totalRevenue]);
+
+  const topClient = analytics.topClients?.[0];
+  const topBroker = useMemo(() => {
+    const list = analytics.fleetUtilization || [];
+    return list.reduce((best, current) => (
+      Number(current.utilization || 0) > Number(best?.utilization || 0) ? current : best
+    ), null);
+  }, [analytics]);
+
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-6 shadow-card border border-neutral-100">
-              <div className="skeleton h-4 w-32 mb-3" />
-              <div className="skeleton h-8 w-20 mb-2" />
-            </div>
-          ))}
+        <div className="skeleton h-44 rounded-[28px]" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 skeleton h-96 rounded-2xl" />
+          <div className="skeleton h-96 rounded-2xl" />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-6 shadow-card border border-neutral-100">
-              <div className="skeleton h-5 w-40 mb-6" />
-              <div className="skeleton h-48 w-full" />
-            </div>
-          ))}
+          <div className="skeleton h-80 rounded-2xl" />
+          <div className="skeleton h-80 rounded-2xl" />
         </div>
       </div>
     );
@@ -126,168 +156,180 @@ export default function Analytics() {
         <p className="text-sm text-neutral-500 mt-1">Platform performance metrics and insights</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-neutral-500 font-medium">Delivery Success Rate</p>
-              <h3 className="text-2xl font-poppins font-bold text-secondary mt-1">{stats.totalBookings ? Math.max(0, Math.min(100, Math.round((Number(stats.activeTrips || 0) / Number(stats.totalBookings || 1)) * 100))) : 0}%</h3>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-tertiary/10 flex items-center justify-center">
-              <TrendingUp size={20} className="text-tertiary" />
-            </div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-neutral-500 font-medium">Avg Bookings/Day</p>
-              <h3 className="text-2xl font-poppins font-bold text-secondary mt-1">{avgBookingsPerDay}</h3>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ClipboardList size={20} className="text-primary" />
-            </div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-neutral-500 font-medium">Avg Revenue/Booking</p>
-              <h3 className="text-2xl font-poppins font-bold text-secondary mt-1">₹{avgRevenuePerBooking.toLocaleString("en-IN")}</h3>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-warning/10 flex items-center justify-center">
-              <IndianRupee size={20} className="text-warning" />
-            </div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-neutral-500 font-medium">Broker Retention Rate</p>
-              <h3 className="text-2xl font-poppins font-bold text-secondary mt-1">{brokerEngagementRate}%</h3>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-purple-50 flex items-center justify-center">
-              <Users size={20} className="text-purple-500" />
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard title="Delivery Success Rate" value={stats.totalBookings ? Math.max(0, Math.min(100, Math.round((Number(stats.activeTrips || 0) / Number(stats.totalBookings || 1)) * 100))) : 0} icon={TrendingUp} change={stats.bookingsChange || 0} prefix="" />
+        <StatCard title="Avg Bookings / Day" value={avgBookingsPerDay} icon={ClipboardList} change={stats.activeTripsChange || 0} />
+        <StatCard title="Avg Revenue / Booking" value={avgRevenuePerBooking} icon={IndianRupee} change={stats.revenueChange || 0} prefix="₹" />
+        <StatCard title="Broker Engagement" value={brokerEngagementRate} icon={Users} change={stats.trucksChange || 0} prefix="" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <h3 className="text-base font-poppins font-semibold text-secondary mb-4">GMV (Gross Merchandise Value) - 12 Months</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analytics.gmvOverMonths || []} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} />
-              <YAxis stroke="#94A3B8" fontSize={12} tickFormatter={(v) => `₹${(v / 1000000).toFixed(1)}M`} />
-              <Tooltip content={<CustomTooltip prefix="₹" />} />
-              <Line type="monotone" dataKey="gmv" stroke="#1976FF" strokeWidth={2.5} dot={{ fill: "#1976FF", r: 3 }} activeDot={{ r: 5 }} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="card lg:col-span-2 p-5">
+          <SectionHeader
+            eyebrow="Performance"
+            title="GMV trend vs revenue trend"
+            description="Twelve-month movement of gross merchandise value and realized revenue."
+            metric={`${analytics.gmvOverMonths?.length || 0} months`}
+          />
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={analytics.gmvOverMonths || []} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <defs>
+                <linearGradient id="analyticsGmvFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#166534" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="#166534" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+              <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => shortMoney(v).replace('₹', '')} />
+              <Tooltip content={<ChartTooltip prefix="₹" />} />
+              <Area type="monotone" dataKey="gmv" stroke="#166534" fill="url(#analyticsGmvFill)" strokeWidth={2.5} />
+              <Line type="monotone" data={analytics.revenueOverMonths || []} dataKey="revenue" stroke="#0D9488" strokeWidth={2.5} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="card p-5">
-          <h3 className="text-base font-poppins font-semibold text-secondary mb-4">Total Revenue - 12 Months</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analytics.revenueOverMonths || []} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} />
-              <YAxis stroke="#94A3B8" fontSize={12} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
-              <Tooltip content={<CustomTooltip prefix="₹" />} />
-              <Bar dataKey="revenue" fill="#17D86B" radius={[6, 6, 0, 0]} barSize={30} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-poppins font-semibold text-secondary">Booking Conversion Rate</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-poppins font-bold text-primary">{repeatClientRate}%</span>
-            <span className="text-xs text-tertiary flex items-center gap-0.5">
-              <TrendingUp size={12} /> Live
-            </span>
+          <SectionHeader
+            eyebrow="Health"
+            title="Repeat client share"
+            description="Current split between repeat clients and new clients in the tracked top cohort."
+            metric={`${repeatClientRate}%`}
+          />
+          <div className="relative flex items-center justify-center">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Repeat', value: repeatClientRate },
+                    { name: 'New', value: Math.max(0, 100 - repeatClientRate) },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={72}
+                  outerRadius={105}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  <Cell fill="#166534" />
+                  <Cell fill="#E2E8F0" />
+                </Pie>
+                <Tooltip formatter={(value) => [`${value}%`, 'Share']} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute text-center">
+              <p className="text-3xl font-poppins font-bold text-secondary">{repeatClientRate}%</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-400 mt-1">Repeat</p>
+            </div>
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={80}>
-          <LineChart data={bookingConversionData}>
-            <Tooltip content={<KPITooltip />} />
-            <Line type="monotone" dataKey="rate" stroke="#1976FF" strokeWidth={3} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card p-5">
-          <h3 className="text-base font-poppins font-semibold text-secondary mb-4">Top 5 Clients by Spend</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={analytics.topClients || []} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-              <XAxis type="number" stroke="#94A3B8" fontSize={12} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
-              <YAxis dataKey="name" type="category" stroke="#64748B" fontSize={12} width={100} />
-              <Tooltip content={<CustomTooltip prefix="₹" />} />
-              <Bar dataKey="spend" fill="#1976FF" radius={[0, 6, 6, 0]} barSize={24} />
-            </BarChart>
+          <SectionHeader
+            eyebrow="Conversion"
+            title="Booking conversion rhythm"
+            description="Sparkline of booking conversion movement across the recent tracking window."
+            metric={`${avgBookingsPerDay} avg/day`}
+          />
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={bookingConversionData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <defs>
+                <linearGradient id="conversionFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0D9488" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="#0D9488" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+              <XAxis dataKey="label" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+              <Tooltip content={<ChartTooltip />} />
+              <Area type="monotone" dataKey="rate" stroke="#0D9488" fill="url(#conversionFill)" strokeWidth={2.5} />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 
         <div className="card p-5">
-          <h3 className="text-base font-poppins font-semibold text-secondary mb-4">Repeat Client Rate</h3>
-          <div className="flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={[{ name: "Repeat", value: repeatClientRate }, { name: "New", value: Math.max(0, 100 - repeatClientRate) }]}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={95}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  <Cell fill="#1976FF" />
-                  <Cell fill="#E2E8F0" />
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute">
-              <span className="text-3xl font-poppins font-bold text-primary">{repeatClientRate}%</span>
-            </div>
-          </div>
-          <p className="text-center text-sm text-neutral-500 mt-2">share of currently repeating top clients</p>
+          <SectionHeader
+            eyebrow="Brokers"
+            title="Fleet utilization"
+            description="Utilization percentages for the most active brokers in the current dataset."
+            metric={`${brokerEngagementRate}% engaged`}
+          />
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={analytics.fleetUtilization || []} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+              <XAxis dataKey="broker" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+              <Tooltip formatter={(value) => [`${value}%`, 'Utilization']} />
+              <Bar dataKey="utilization" fill="#17D86B" radius={[8, 8, 0, 0]} barSize={44} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="card p-5">
-        <h3 className="text-base font-poppins font-semibold text-secondary mb-4">Fleet Utilization % - Top Brokers</h3>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={analytics.fleetUtilization || []} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-            <XAxis dataKey="broker" stroke="#94A3B8" fontSize={12} />
-            <YAxis stroke="#94A3B8" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-            <Tooltip formatter={(v) => [`${v}%`, "Utilization"]} />
-            <Bar dataKey="utilization" fill="#17D86B" radius={[6, 6, 0, 0]} barSize={60} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-4">
+        <div className="card p-5">
+          <SectionHeader
+            eyebrow="Clients"
+            title="Top clients by spend"
+            description="Highest-spending clients across the current analytics window."
+            metric={topClient ? `${money(topClient.spend)} leader` : null}
+          />
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={analytics.topClients || []} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
+              <XAxis type="number" stroke="#94A3B8" fontSize={12} tickFormatter={(v) => shortMoney(v)} />
+              <YAxis dataKey="name" type="category" stroke="#64748B" fontSize={12} width={110} />
+              <Tooltip content={<ChartTooltip prefix="₹" />} />
+              <Bar dataKey="spend" fill="#166534" radius={[0, 8, 8, 0]} barSize={24} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-      <div className="card p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-poppins font-semibold text-secondary">Average Revenue Per Broker</h3>
-            <p className="text-sm text-neutral-500 mt-1">Monthly average across all active brokers</p>
+        <div className="space-y-4">
+          <div className="card p-5">
+            <SectionHeader
+              eyebrow="Revenue quality"
+              title="Average revenue per broker"
+              description="Monthly average revenue spread across brokers participating in the fleet dataset."
+            />
+            <div className="rounded-3xl border border-neutral-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ecfdf5_100%)] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">Live average</p>
+                  <p className="mt-2 text-3xl font-poppins font-bold text-secondary">{money(averageRevenuePerBroker)}</p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                  <CircleDollarSign size={22} />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-3xl font-poppins font-bold text-secondary">
-              ₹{Math.round((analytics.revenueOverMonths || []).reduce((sum, item) => sum + Number(item.revenue || 0), 0) / Math.max(1, (analytics.fleetUtilization || []).length)).toLocaleString("en-IN")}
-            </span>
-            <p className="text-sm text-tertiary flex items-center justify-end gap-1">
-              <TrendingUp size={14} /> Live average
-            </p>
+
+          <div className="card p-5">
+            <SectionHeader
+              eyebrow="Mix"
+              title="Revenue distribution snapshot"
+              description="Relative weight of the tracked analytics sections."
+            />
+            <div className="space-y-3">
+              {[
+                { label: 'GMV tracked', value: shortMoney((analytics.gmvOverMonths || []).reduce((sum, item) => sum + Number(item.gmv || 0), 0)), color: COLORS[0] },
+                { label: 'Revenue tracked', value: shortMoney(totalRevenue), color: COLORS[1] },
+                { label: 'Top client leader', value: topClient ? money(topClient.spend) : 'No data', color: COLORS[2] },
+                { label: 'Top broker utilization', value: topBroker ? `${topBroker.utilization}%` : 'No data', color: COLORS[3] },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-2xl bg-neutral-50 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-sm text-neutral-600">{item.label}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-secondary">{item.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

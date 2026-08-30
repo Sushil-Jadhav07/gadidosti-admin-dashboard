@@ -5,10 +5,14 @@ import TopBar from './components/TopBar';
 import Toast from './components/Toast';
 import Dashboard from './pages/Dashboard';
 import Bookings from './pages/Bookings';
+import ViewBooking from './pages/ViewBooking';
+import EditBooking from './pages/EditBooking';
 import Users from './pages/Users';
 import Brokers from './pages/Brokers';
 import Drivers from './pages/Drivers';
 import Trucks from './pages/Trucks';
+import CreateDriver from './pages/CreateDriver';
+import RegisterTruck from './pages/RegisterTruck';
 import Pricing from './pages/Pricing';
 import Disputes from './pages/Disputes';
 import Incidents from './pages/Incidents';
@@ -120,7 +124,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F0F4FA]">
+    <div className="min-h-screen bg-[#F6F8F7]">
       <div className="hidden lg:block">
         <Sidebar hoverExpand onHoverChange={setSidebarHovered} />
       </div>
@@ -140,10 +144,14 @@ export default function App() {
           <Routes>
             <Route path="/"          element={<Dashboard />} />
             <Route path="/bookings"  element={<Bookings />} />
+            <Route path="/bookings/:id/edit" element={<EditBooking />} />
+            <Route path="/bookings/:id" element={<ViewBooking />} />
             <Route path="/users"     element={<Users />} />
             <Route path="/brokers"   element={<Brokers />} />
             <Route path="/drivers"   element={<Drivers />} />
+            <Route path="/drivers/create" element={<CreateDriver />} />
             <Route path="/trucks"    element={<Trucks />} />
+            <Route path="/trucks/create" element={<RegisterTruck />} />
             <Route path="/tracking"        element={<Tracking />} />
             <Route path="/tracking/:imei"  element={<TrackingDetail />} />
             <Route path="/invoices"  element={<Invoices />} />

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search, Eye, Ban, UserCheck, Trash2, CheckCircle2, XCircle,
-  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, X,
+  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, X, Filter,
 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
@@ -205,90 +205,20 @@ export default function Users() {
   const itemsPerPage = 10;
   const startIndex = (page - 1) * itemsPerPage + 1;
   const endIndex = Math.min(page * itemsPerPage, total);
+  const pageNumbers = Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+    if (totalPages <= 7) return i + 1;
+    if (page <= 4) return i + 1;
+    if (page >= totalPages - 3) return totalPages - 6 + i;
+    return page - 3 + i;
+  });
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-poppins font-bold text-secondary">Users</h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            {loading ? 'Loading...' : `${total} registered user${total !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <button
-          onClick={() => fetchUsers(page, search, roleFilter, statusFilter, kycFilter)}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-800 border border-neutral-200 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors disabled:opacity-40"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="card p-3">
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search name, email, phone..."
-              value={search}
-              onChange={handleSearchChange}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
-            />
-          </div>
-
-          {/* Role dropdown */}
-          <div className="relative w-40 flex-shrink-0">
-            <select
-              value={roleFilter}
-              onChange={(e) => applyFilter(e.target.value, statusFilter)}
-              className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-neutral-700 cursor-pointer"
-            >
-              <option value="">All Roles</option>
-              {ROLES.slice(1).map((r) => <option key={r} value={r}>{cap(r)}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-          </div>
-
-          {/* Status dropdown */}
-          <div className="relative w-44 flex-shrink-0">
-            <select
-              value={statusFilter}
-              onChange={(e) => applyFilter(roleFilter, e.target.value)}
-              className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-neutral-700 cursor-pointer"
-            >
-              <option value="">All Statuses</option>
-              {STATUSES.slice(1).map((s) => <option key={s} value={s}>{cap(s)}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-          </div>
-
-          {/* KYC dropdown */}
-          <div className="relative w-44 flex-shrink-0">
-            <select
-              value={kycFilter}
-              onChange={(e) => applyFilter(roleFilter, statusFilter, e.target.value)}
-              className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-neutral-700 cursor-pointer"
-            >
-              <option value="">All KYC Status</option>
-              {KYC_STATUSES.slice(1).map((s) => <option key={s} value={s}>{KYC_LABEL[s]}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-          </div>
-
-          {/* Clear */}
-          {(roleFilter || statusFilter || kycFilter) && (
-            <button
-              onClick={() => applyFilter('', '', '')}
-              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors flex-shrink-0 whitespace-nowrap"
-            >
-              <X size={12} /> Clear
-            </button>
-          )}
-        </div>
+      <div>
+        <h1 className="text-2xl font-poppins font-bold text-secondary">Users</h1>
+        <p className="text-sm text-neutral-500 mt-1">
+          {loading ? 'Loading...' : `${total} registered user${total !== 1 ? 's' : ''}`}
+        </p>
       </div>
 
       {error && (
@@ -298,8 +228,79 @@ export default function Users() {
         </div>
       )}
 
-      {/* Table */}
       <div className="card overflow-hidden">
+        <div className="px-5 pt-4 pb-2 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-poppins font-semibold text-secondary">Users</h3>
+          <button
+            onClick={() => fetchUsers(page, search, roleFilter, statusFilter, kycFilter)}
+            disabled={loading}
+            className="btn-secondary !py-2 !px-3 text-sm disabled:opacity-40"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        <div className="px-5 pt-4 pb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary">
+              <Filter size={14} />
+              Filters
+            </div>
+            <div className="relative min-w-[150px]">
+              <select
+                value={roleFilter}
+                onChange={(e) => applyFilter(e.target.value, statusFilter)}
+                className="form-select !py-2 pl-3 pr-8"
+              >
+                <option value="">All Roles</option>
+                {ROLES.slice(1).map((r) => <option key={r} value={r}>{cap(r)}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            </div>
+            <div className="relative min-w-[160px]">
+              <select
+                value={statusFilter}
+                onChange={(e) => applyFilter(roleFilter, e.target.value)}
+                className="form-select !py-2 pl-3 pr-8"
+              >
+                <option value="">All Statuses</option>
+                {STATUSES.slice(1).map((s) => <option key={s} value={s}>{cap(s)}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            </div>
+            <div className="relative min-w-[170px]">
+              <select
+                value={kycFilter}
+                onChange={(e) => applyFilter(roleFilter, statusFilter, e.target.value)}
+                className="form-select !py-2 pl-3 pr-8"
+              >
+                <option value="">All KYC Status</option>
+                {KYC_STATUSES.slice(1).map((s) => <option key={s} value={s}>{KYC_LABEL[s]}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            </div>
+            {(roleFilter || statusFilter || kycFilter) && (
+              <button
+                onClick={() => applyFilter('', '', '')}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+              >
+                <X size={13} /> Clear
+              </button>
+            )}
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search name, email, phone..."
+              value={search}
+              onChange={handleSearchChange}
+              className="form-input pl-9 !py-2"
+            />
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
@@ -395,7 +396,7 @@ export default function Users() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-100">
+          <div className="flex items-center justify-between px-5 py-4 border-t border-neutral-100">
             <p className="text-sm text-neutral-500">
               Showing {startIndex}–{endIndex} of {total} users
             </p>
@@ -403,29 +404,25 @@ export default function Users() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
-              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                const p = totalPages <= 7 ? i + 1
-                  : page <= 4 ? i + 1
-                  : page >= totalPages - 3 ? totalPages - 6 + i
-                  : page - 3 + i;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === p ? 'bg-primary text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
+              {pageNumbers.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  onClick={() => setPage(pageNumber)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                    page === pageNumber ? 'bg-primary text-white' : 'text-neutral-600 hover:bg-neutral-50 border border-neutral-200'
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              ))}
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
               >
                 <ChevronRight size={16} />
               </button>

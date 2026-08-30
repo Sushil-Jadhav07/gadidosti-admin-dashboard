@@ -32,7 +32,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
             </button>
           </div>
         )}
-        <div className="p-6 overflow-y-auto scrollbar-thin-light">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

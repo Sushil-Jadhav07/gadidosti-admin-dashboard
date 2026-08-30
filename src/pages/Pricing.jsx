@@ -4,7 +4,7 @@ import Toast from "../components/Toast";
 import { api, getToken } from "../services/api";
 
 const CATEGORY_META = {
-  small: { label: "Small Truck", color: "#1976FF", tint: "bg-[#1976FF]/10" },
+  small: { label: "Small Truck", color: "#166534", tint: "bg-[#166534]/10" },
   medium: { label: "Medium Truck", color: "#17D86B", tint: "bg-[#17D86B]/10" },
   large: { label: "Large Truck", color: "#F59E0B", tint: "bg-[#F59E0B]/10" },
 };

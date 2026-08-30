@@ -80,6 +80,13 @@ export default function Brokers() {
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+  const pageNumbers = Array.from({ length: Math.min(totalPages || 1, 5) }, (_, i) => {
+    const safeTotalPages = totalPages || 1;
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(safeTotalPages, start + 4);
+    start = Math.max(1, end - 4);
+    return start + i;
+  }).filter((page, index, arr) => page <= (totalPages || 1) && arr.indexOf(page) === index);
 
   const handleToggleBlock = async (broker) => {
     const nextStatus = broker.status === 'blocked' ? 'active' : 'blocked';
@@ -107,19 +114,6 @@ export default function Brokers() {
         <p className="text-sm text-neutral-500 mt-1">Manage registered brokers and their fleet</p>
       </div>
 
-      <div className="card p-4">
-        <div className="relative max-w-xs">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="text"
-            placeholder="Search brokers..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="form-input pl-9"
-          />
-        </div>
-      </div>
-
       {error && (
         <div className="card p-4 text-sm text-danger flex items-center gap-2">
           <span>{error}</span>
@@ -133,7 +127,21 @@ export default function Brokers() {
         </div>
       ) : (
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="px-5 pt-4 pb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-poppins font-semibold text-secondary">Brokers</h3>
+          <div className="relative w-full sm:w-64">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              placeholder="Search brokers..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="form-input pl-9 !py-2"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto mt-3">
           <table className="data-table">
             <thead>
               <tr>
@@ -189,14 +197,14 @@ export default function Brokers() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-100">
+          <div className="flex items-center justify-between px-5 py-4 border-t border-neutral-100">
             <p className="text-sm text-neutral-500">Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filtered.length)} of {filtered.length} entries</p>
             <div className="flex items-center gap-1">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"><ChevronLeft size={16} /></button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button key={page} onClick={() => setCurrentPage(page)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === page ? 'bg-primary text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}>{page}</button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"><ChevronLeft size={16} /></button>
+              {pageNumbers.map((page) => (
+                <button key={page} onClick={() => setCurrentPage(page)} className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${currentPage === page ? 'bg-primary text-white' : 'text-neutral-600 hover:bg-neutral-50 border border-neutral-200'}`}>{page}</button>
               ))}
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"><ChevronRight size={16} /></button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"><ChevronRight size={16} /></button>
             </div>
           </div>
         )}
