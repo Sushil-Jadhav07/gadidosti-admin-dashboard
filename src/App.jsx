@@ -22,6 +22,7 @@ import Settings from './pages/Settings';
 import Tracking from './pages/Tracking';
 import TrackingDetail from './pages/TrackingDetail';
 import Invoices from './pages/Invoices';
+import Chats from './pages/Chats';
 import Login from './pages/Login';
 import { api } from './services/api';
 import { requestFcmToken, onForegroundMessage } from './lib/firebase';
@@ -36,6 +37,7 @@ export default function App() {
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [pushToast, setPushToast] = useState(null);
   const fcmTokenRef = useRef(null);
+  const chatThreadsSnapshotRef = useRef(null);
   const navigate = useNavigate();
 
   const isLoggedIn = !!authData;
@@ -119,6 +121,44 @@ export default function App() {
     return () => { cancelled = true; unsubscribe(); };
   }, [isLoggedIn]);
 
+  // Admin isn't a participant on any booking, so it never gets a socket `chat-message` event
+  // for someone else's thread — the pragmatic substitute is polling the thread list and
+  // toasting only on the delta, app-wide (not just while the Chats page is mounted) so a
+  // client typing into the bot, or a broker replying, still surfaces while admin is elsewhere.
+  useEffect(() => {
+    if (!isLoggedIn || !accessToken) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const res = await api.get('/api/chat/threads', accessToken);
+        if (cancelled || !res?.success) return;
+        const threads = res.data?.threads || [];
+        const previous = chatThreadsSnapshotRef.current;
+        if (previous) {
+          const updated = threads.find((t) => (
+            t.lastMessageAt
+            && t.lastSenderRole !== 'admin'
+            && new Date(t.lastMessageAt).getTime() > (previous.get(t.threadId) || 0)
+          ));
+          if (updated) {
+            setPushToast({
+              message: `New chat activity — ${updated.bookingNumber || 'a booking'}: ${updated.lastMessage || 'New message'}`,
+              navigateTo: '/chats',
+            });
+          }
+        }
+        chatThreadsSnapshotRef.current = new Map(threads.map((t) => [t.threadId, new Date(t.lastMessageAt || 0).getTime()]));
+      } catch {
+        // Best-effort — the next tick will just diff against a slightly older snapshot.
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 45000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isLoggedIn, accessToken]);
+
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
   }
@@ -155,6 +195,7 @@ export default function App() {
             <Route path="/tracking"        element={<Tracking />} />
             <Route path="/tracking/:imei"  element={<TrackingDetail />} />
             <Route path="/invoices"  element={<Invoices />} />
+            <Route path="/chats"     element={<Chats />} />
             <Route path="/pricing"   element={<Pricing />} />
             <Route path="/disputes"  element={<Disputes />} />
             <Route path="/incidents" element={<Incidents />} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ChevronLeft, Pencil, Trash2, AlertTriangle, CheckCircle2, Circle, XCircle,
@@ -125,10 +125,11 @@ export default function ViewBooking() {
   const [loading, setLoading] = useState(!location.state?.booking);
   const [loadError, setLoadError] = useState('');
   const [loadingPod, setLoadingPod] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(!!location.state?.openChat);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState(null);
+  const chatSectionRef = useRef(null);
 
   useEffect(() => {
     if (booking) return;
@@ -152,6 +153,14 @@ export default function ViewBooking() {
     })();
     return () => { cancelled = true; };
   }, [id, booking]);
+
+  // Arriving from the Chats list opens straight to the conversation instead of making
+  // admin re-find and click "View Chat" on a page full of other booking details.
+  useEffect(() => {
+    if (location.state?.openChat && booking) {
+      chatSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.state?.openChat, booking]);
 
   const viewProofOfDelivery = async () => {
     if (!booking.podUrl || loadingPod) return;
@@ -301,17 +310,19 @@ export default function ViewBooking() {
           </button>
         )}
 
-        <button
-          onClick={() => setShowChat((v) => !v)}
-          className="w-full flex items-center gap-2.5 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors"
-        >
-          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-            <MessageCircle size={16} />
-          </div>
-          <span className="text-sm font-medium text-neutral-700">{showChat ? 'Hide Chat' : 'View Chat (read-only)'}</span>
-        </button>
+        <div ref={chatSectionRef}>
+          <button
+            onClick={() => setShowChat((v) => !v)}
+            className="w-full flex items-center gap-2.5 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <MessageCircle size={16} />
+            </div>
+            <span className="text-sm font-medium text-neutral-700">{showChat ? 'Hide Chat' : 'View Chat'}</span>
+          </button>
 
-        {showChat && <ChatWindow bookingId={booking.id} />}
+          {showChat && <div className="mt-3"><ChatWindow bookingId={booking.id} /></div>}
+        </div>
 
         <div className="border border-danger/20 bg-danger/5 rounded-2xl p-4 flex items-start justify-between gap-3">
           <div>
