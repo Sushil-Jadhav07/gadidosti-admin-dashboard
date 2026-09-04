@@ -1,8 +1,9 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Toast from './components/Toast';
+import ChatLauncher from './components/ChatLauncher';
 import Dashboard from './pages/Dashboard';
 import Bookings from './pages/Bookings';
 import ViewBooking from './pages/ViewBooking';
@@ -34,8 +35,8 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('ssk_admin_auth')); } catch { return null; }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [pushToast, setPushToast] = useState(null);
+  const [chatThreads, setChatThreads] = useState([]);
   const fcmTokenRef = useRef(null);
   const chatThreadsSnapshotRef = useRef(null);
   const navigate = useNavigate();
@@ -125,39 +126,41 @@ export default function App() {
   // for someone else's thread — the pragmatic substitute is polling the thread list and
   // toasting only on the delta, app-wide (not just while the Chats page is mounted) so a
   // client typing into the bot, or a broker replying, still surfaces while admin is elsewhere.
+  // Pulled out of the effect (as a stable callback) so the floating ChatLauncher can trigger an
+  // early tick when it's opened, without needing a second poller of its own.
+  const pollChatThreads = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const res = await api.get('/api/chat/threads', accessToken);
+      if (!res?.success) return;
+      const threads = res.data?.threads || [];
+      setChatThreads(threads);
+      const previous = chatThreadsSnapshotRef.current;
+      if (previous) {
+        const updated = threads.find((t) => (
+          t.lastMessageAt
+          && t.lastSenderRole !== 'admin'
+          && new Date(t.lastMessageAt).getTime() > (previous.get(t.threadId) || 0)
+        ));
+        if (updated) {
+          setPushToast({
+            message: `New chat activity — ${updated.bookingNumber || 'a booking'}: ${updated.lastMessage || 'New message'}`,
+            navigateTo: '/chats',
+          });
+        }
+      }
+      chatThreadsSnapshotRef.current = new Map(threads.map((t) => [t.threadId, new Date(t.lastMessageAt || 0).getTime()]));
+    } catch {
+      // Best-effort — the next tick will just diff against a slightly older snapshot.
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     if (!isLoggedIn || !accessToken) return;
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const res = await api.get('/api/chat/threads', accessToken);
-        if (cancelled || !res?.success) return;
-        const threads = res.data?.threads || [];
-        const previous = chatThreadsSnapshotRef.current;
-        if (previous) {
-          const updated = threads.find((t) => (
-            t.lastMessageAt
-            && t.lastSenderRole !== 'admin'
-            && new Date(t.lastMessageAt).getTime() > (previous.get(t.threadId) || 0)
-          ));
-          if (updated) {
-            setPushToast({
-              message: `New chat activity — ${updated.bookingNumber || 'a booking'}: ${updated.lastMessage || 'New message'}`,
-              navigateTo: '/chats',
-            });
-          }
-        }
-        chatThreadsSnapshotRef.current = new Map(threads.map((t) => [t.threadId, new Date(t.lastMessageAt || 0).getTime()]));
-      } catch {
-        // Best-effort — the next tick will just diff against a slightly older snapshot.
-      }
-    };
-
-    poll();
-    const interval = setInterval(poll, 45000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [isLoggedIn, accessToken]);
+    pollChatThreads();
+    const interval = setInterval(pollChatThreads, 45000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, accessToken, pollChatThreads]);
 
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
@@ -166,21 +169,21 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F6F8F7]">
       <div className="hidden lg:block">
-        <Sidebar hoverExpand onHoverChange={setSidebarHovered} />
+        <Sidebar />
       </div>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)}></div>
           <div className="absolute left-0 top-0 h-full">
-            <Sidebar forceExpanded />
+            <Sidebar />
           </div>
         </div>
       )}
 
-      <div className={`transition-all duration-300 ${sidebarHovered ? 'lg:ml-64' : 'lg:ml-16'}`}>
+      <div className="lg:ml-64">
         <TopBar onMenuClick={toggleMobile} onLogout={handleLogout} user={authData?.user} />
-        <main className="px-4 pt-4 pb-8 lg:px-6 lg:pt-5 lg:pb-10 min-h-[calc(100vh-4rem)]">
+        <main className="px-4 pt-4 pb-8 lg:px-6 lg:pt-5 lg:pb-1 min-h-[calc(100vh-4rem)]">
           <Routes>
             <Route path="/"          element={<Dashboard />} />
             <Route path="/bookings"  element={<Bookings />} />
@@ -214,6 +217,8 @@ export default function App() {
           onClick={pushToast.navigateTo ? () => { navigate(pushToast.navigateTo); setPushToast(null); } : undefined}
         />
       )}
+
+      <ChatLauncher threads={chatThreads} onRefresh={pollChatThreads} />
     </div>
   );
 }

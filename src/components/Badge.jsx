@@ -1,7 +1,7 @@
 const statusConfig = {
   'Requested':       'bg-blue-50 text-blue-700 border-blue-200',
   'Accepted':        'bg-indigo-50 text-indigo-700 border-indigo-200',
-  'Assigned':        'bg-violet-50 text-violet-700 border-violet-200',
+  'Assigned':        'bg-primary/10 text-primary border-primary/20',
   'En Route':        'bg-cyan-50 text-cyan-700 border-cyan-200',
   'En Route Pickup': 'bg-cyan-50 text-cyan-700 border-cyan-200',
   'Picked Up':       'bg-sky-50 text-sky-700 border-sky-200',
@@ -13,7 +13,7 @@ const statusConfig = {
   'Inactive':        'bg-neutral-100 text-neutral-500 border-neutral-200',
   'Blocked':         'bg-red-50 text-red-700 border-red-200',
   'Client':          'bg-blue-50 text-blue-700 border-blue-200',
-  'Broker':          'bg-violet-50 text-violet-700 border-violet-200',
+  'Broker':          'bg-primary/10 text-primary border-primary/20',
   'Driver':          'bg-amber-50 text-amber-700 border-amber-200',
   'Admin':           'bg-secondary/10 text-secondary border-secondary/20',
   'Available':       'bg-green-50 text-green-700 border-green-200',
@@ -31,6 +31,9 @@ const statusConfig = {
   'Paid':            'bg-green-50 text-green-700 border-green-200',
   'Refund':          'bg-orange-50 text-orange-700 border-orange-200',
   'Refunded':        'bg-orange-50 text-orange-700 border-orange-200',
+  'Bot':             'bg-primary/10 text-primary border-primary/20',
+  'Live':            'bg-green-50 text-green-700 border-green-200',
+  'Closed':          'bg-neutral-100 text-neutral-500 border-neutral-200',
 };
 
 export default function Badge({ status, children }) {

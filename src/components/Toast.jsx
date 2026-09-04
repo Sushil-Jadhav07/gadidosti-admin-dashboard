@@ -20,7 +20,9 @@ export default function Toast({ message, type = 'success', onClose, duration = 3
   return (
     <div
       onClick={onClick}
-      className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl border shadow-lg transition-all duration-300 ${cls} ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${onClick ? 'cursor-pointer' : ''}`}
+      // bottom-24, not bottom-6 — the floating chat launcher FAB now sits at bottom-6 right-6
+      // on every page, and a toast at the same spot would land right on top of it.
+      className={`fixed bottom-24 right-6 z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl border shadow-lg transition-all duration-300 ${cls} ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${onClick ? 'cursor-pointer' : ''}`}
     >
       <Icon size={18} className={`flex-shrink-0 ${iconCls}`} />
       <span className="text-sm font-medium">{message}</span>

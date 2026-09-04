@@ -9,6 +9,7 @@ import ChatWindow from '../components/ChatWindow';
 import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 import { STATUS_MAP, money, bookingRef, CATEGORY_COLOR, DeletedBadge, DeleteBookingModal } from './Bookings';
+import { useTripStatusSocket } from '../hooks/useTripStatusSocket';
 
 const TIMELINE_STEPS = [
   { key: 'pending', label: 'Requested' },
@@ -153,6 +154,16 @@ export default function ViewBooking() {
     })();
     return () => { cancelled = true; };
   }, [id, booking]);
+
+  // Live push — the moment a driver/broker changes this trip's status, silently re-fetch so the
+  // timeline/status badge update instantly instead of needing a manual reload. Booking was
+  // previously only ever fetched once (see the effect above, guarded on `if (booking) return`).
+  useTripStatusSocket((trip) => {
+    if (!trip?.bookingId || trip.bookingId !== id) return;
+    api.get(`/api/bookings/${id}`, getToken())
+      .then((res) => { if (res?.success && res.data?.booking) setBooking(res.data.booking); })
+      .catch(() => {});
+  });
 
   // Arriving from the Chats list opens straight to the conversation instead of making
   // admin re-find and click "View Chat" on a page full of other booking details.
@@ -321,7 +332,7 @@ export default function ViewBooking() {
             <span className="text-sm font-medium text-neutral-700">{showChat ? 'Hide Chat' : 'View Chat'}</span>
           </button>
 
-          {showChat && <div className="mt-3"><ChatWindow bookingId={booking.id} /></div>}
+          {showChat && <div className="mt-3"><ChatWindow bookingId={booking.id} clientName={booking.client} /></div>}
         </div>
 
         <div className="border border-danger/20 bg-danger/5 rounded-2xl p-4 flex items-start justify-between gap-3">

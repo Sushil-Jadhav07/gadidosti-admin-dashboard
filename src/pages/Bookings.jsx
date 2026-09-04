@@ -571,12 +571,22 @@ export default function Bookings() {
         </div>
       ) : (
       <div className="card overflow-hidden">
-        <div className="px-5 pt-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-base font-poppins font-semibold text-secondary">Bookings</h3>
-          <div className="flex items-center gap-2">
+        <div className="px-5 pt-5 pb-4 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100">
+          <div>
+            <h3 className="text-base font-poppins font-semibold text-secondary">Bookings</h3>
+            <p className="text-xs text-neutral-400 mt-0.5">{filteredBookings.length} result{filteredBookings.length === 1 ? '' : 's'}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative w-full sm:w-60">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input type="text" placeholder="Search bookings..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="form-input pl-9 !py-2" />
+            </div>
             <div className="relative" ref={filtersRef}>
-              <button onClick={() => setFiltersOpen((v) => !v)} className="btn-secondary !py-2 !px-3 text-sm">
-                <Filter size={14} /> {truckTypeFilter === 'All Types' ? 'Filters' : truckTypeFilter}
+              <button
+                onClick={() => setFiltersOpen((v) => !v)}
+                className={`!py-2 !px-3 text-sm ${truckTypeFilter === 'All Types' ? 'btn-secondary' : 'bg-primary/10 text-primary border border-primary/20 inline-flex items-center gap-2 rounded-xl font-semibold transition-colors hover:bg-primary/15'}`}
+              >
+                <Filter size={14} /> {truckTypeFilter === 'All Types' ? 'Filter' : truckTypeFilter}
               </button>
               {filtersOpen && (
                 <div className="absolute right-0 top-10 w-48 bg-white border border-neutral-100 rounded-xl shadow-dropdown z-20 p-3">
@@ -593,41 +603,35 @@ export default function Bookings() {
           </div>
         </div>
 
-        <div className="px-5 pt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1.5 overflow-x-auto">
+        <div className="px-5 py-3 border-b border-neutral-100">
+          <div className="inline-flex flex-wrap gap-1 bg-neutral-50 rounded-xl p-1 overflow-x-auto max-w-full">
             {statusTabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setStatusTab(tab)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  statusTab === tab ? 'bg-primary/10 text-primary border border-primary/20' : 'text-neutral-500 hover:bg-neutral-50 border border-transparent'
+                  statusTab === tab ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
                 }`}
               >
                 {tab}
               </button>
             ))}
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-            <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="form-input pl-9 !py-2" />
-          </div>
         </div>
 
-        <div className="overflow-x-auto mt-3">
+        <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
                 <th className="w-10">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded border-neutral-300 text-primary focus:ring-primary/30 cursor-pointer" />
                 </th>
-                <th>Booking ID</th>
-                <th>Category</th>
-                <th>Merchant</th>
+                <th>Booking</th>
                 <th>Customer</th>
+                <th>Broker / Driver</th>
+                <th>Route</th>
                 <th>Date</th>
                 <th>Fee</th>
-                <th>Assign to</th>
-                <th>Route</th>
                 <th>Status</th>
                 <th className="w-10" />
               </tr>
@@ -638,24 +642,15 @@ export default function Bookings() {
                   <td>
                     <input type="checkbox" checked={selectedIds.has(booking.id)} onChange={() => toggleSelectOne(booking.id)} className="w-4 h-4 rounded border-neutral-300 text-primary focus:ring-primary/30 cursor-pointer" />
                   </td>
-                  <td className="font-medium text-neutral-800 whitespace-nowrap">
-                    {bookingRef(booking)}
-                    {booking.deletedAt && (
-                      <span className="block mt-1"><DeletedBadge deletedAt={booking.deletedAt} className="whitespace-normal max-w-[220px]" /></span>
-                    )}
-                  </td>
                   <td className="whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <CategoryIcon category={booking.truckCategory} />
-                      <span>{booking.truckType || booking.truckCategory || '-'}</span>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
-                        <Building2 size={13} className="text-neutral-400" />
+                      <div>
+                        <span className="font-medium text-neutral-800" title={booking.truckType || booking.truckCategory || undefined}>{bookingRef(booking)}</span>
+                        {booking.deletedAt && (
+                          <span className="block mt-1"><DeletedBadge deletedAt={booking.deletedAt} className="whitespace-normal max-w-[220px]" /></span>
+                        )}
                       </div>
-                      <span>{booking.broker || '-'}</span>
                     </div>
                   </td>
                   <td className="whitespace-nowrap">
@@ -664,19 +659,20 @@ export default function Bookings() {
                       <span>{booking.client || '-'}</span>
                     </div>
                   </td>
+                  <td className="whitespace-nowrap">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <Building2 size={12} className="text-neutral-400 flex-shrink-0" />
+                      <span className="text-neutral-700">{booking.broker || '—'}</span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-neutral-400">
+                      {booking.driver?.name || 'No driver assigned'}
+                    </div>
+                  </td>
+                  <td className="max-w-[200px] truncate text-neutral-500" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>
                   <td className="whitespace-nowrap text-neutral-500">
                     {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                   </td>
                   <td className="font-medium whitespace-nowrap">{money(booking.amount)}</td>
-                  <td className="whitespace-nowrap">
-                    {booking.driver?.name ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar name={booking.driver.name} />
-                        <span>{booking.driver.name}</span>
-                      </div>
-                    ) : <span className="text-neutral-400">-</span>}
-                  </td>
-                  <td className="max-w-[200px] truncate text-neutral-500" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>
                   <td><Badge status={STATUS_MAP[booking.status] || booking.status} /></td>
                   <td className="text-center">
                     <RowMenu
@@ -689,7 +685,7 @@ export default function Bookings() {
                   </td>
                 </tr>
               ))}
-              {paginatedBookings.length === 0 && <tr><td colSpan={11} className="text-center py-12 text-neutral-400">No bookings found matching your filters.</td></tr>}
+              {paginatedBookings.length === 0 && <tr><td colSpan={9} className="text-center py-12 text-neutral-400">No bookings found matching your filters.</td></tr>}
             </tbody>
           </table>
         </div>

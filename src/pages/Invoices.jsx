@@ -153,12 +153,10 @@ export default function Invoices() {
                 <tr>
                   <th>Booking ID</th>
                   <th>Client</th>
-                  <th>Broker</th>
-                  <th>Driver</th>
+                  <th>Broker / Driver</th>
                   <th>Route</th>
                   <th className="text-right">Amount</th>
-                  <th>Payment</th>
-                  <th>Invoice</th>
+                  <th>Payment / Invoice</th>
                   <th>Date</th>
                   <th className="text-center">Actions</th>
                 </tr>
@@ -168,12 +166,22 @@ export default function Invoices() {
                   <tr key={booking.id}>
                     <td className="font-medium text-neutral-800 whitespace-nowrap">{bookingRef(booking)}</td>
                     <td>{booking.client || '-'}</td>
-                    <td className="whitespace-nowrap">{booking.broker || '-'}</td>
-                    <td className="whitespace-nowrap">{booking.driver?.name || '-'}</td>
+                    <td className="whitespace-nowrap">
+                      <div className="text-neutral-700">{booking.broker || '—'}</div>
+                      <div className="text-xs text-neutral-400 mt-0.5">{booking.driver?.name || 'No driver assigned'}</div>
+                    </td>
                     <td className="max-w-[220px] truncate" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>
                     <td className="text-right font-medium whitespace-nowrap">{money(booking.amount)}</td>
-                    <td><Badge status={PAYMENT_STATUS_LABEL[booking.paymentStatus] || booking.paymentStatus} /></td>
-                    <td><Badge status={hasGeneratedInvoice(booking.id) ? 'Created' : 'Not Created'} /></td>
+                    <td className="whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Badge status={PAYMENT_STATUS_LABEL[booking.paymentStatus] || booking.paymentStatus} />
+                        {hasGeneratedInvoice(booking.id) && (
+                          <span title="Invoice generated" className="w-5 h-5 rounded-full bg-tertiary/10 text-tertiary flex items-center justify-center flex-shrink-0">
+                            <Receipt size={11} />
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="whitespace-nowrap">{booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-IN') : '-'}</td>
                     <td className="text-center whitespace-nowrap">
                       <button
@@ -194,7 +202,7 @@ export default function Invoices() {
                 ))}
                 {paginated.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-12 text-neutral-400">
+                    <td colSpan={8} className="text-center py-12 text-neutral-400">
                       <Receipt size={22} className="mx-auto mb-2 text-neutral-300" />
                       No bookings found matching your search.
                     </td>
