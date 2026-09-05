@@ -12,3 +12,16 @@ createRoot(document.getElementById('root')).render(
     <App />
   </BrowserRouter>,
 )
+
+// Remove the boot splash (index.html) once React has painted. loaderGif.gif loops
+// infinitely on its own (no artificial minimum hold needed) — it just keeps animating
+// for as long as this is shown.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const splash = document.getElementById('splash')
+    if (splash) {
+      splash.classList.add('fade-out')
+      setTimeout(() => splash.remove(), 550)
+    }
+  })
+})
