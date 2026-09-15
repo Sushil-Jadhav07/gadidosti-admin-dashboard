@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Save, Globe, Bell, Shield, User, Lock,
-  Camera, Eye, EyeOff, Mail, Phone, IndianRupee, UserPlus,
+  Camera, Eye, EyeOff, Mail, Phone, IndianRupee, UserPlus, Wallet,
 } from "lucide-react";
 import Toast from "../components/Toast";
 import { api, getStoredAuth, getToken } from "../services/api";
@@ -13,12 +13,15 @@ const DEFAULT_SETTINGS = {
   emailAlerts: true,
   smsAlerts: true,
   pushNotifications: true,
+  companyUpiId: "",
+  companyUpiName: "",
 };
 
 const tabs = [
   { id: "profile", label: "My Profile", icon: User },
   { id: "platform", label: "Platform", icon: Globe },
   { id: "commission", label: "Commission", icon: IndianRupee },
+  { id: "payments", label: "Payments", icon: Wallet },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "security", label: "Security", icon: Shield },
   { id: "team", label: "Team", icon: UserPlus },
@@ -137,6 +140,8 @@ export default function Settings() {
           emailAlerts: Boolean(remoteSettings.emailAlerts ?? DEFAULT_SETTINGS.emailAlerts),
           smsAlerts: Boolean(remoteSettings.smsAlerts ?? DEFAULT_SETTINGS.smsAlerts),
           pushNotifications: Boolean(remoteSettings.pushNotifications ?? DEFAULT_SETTINGS.pushNotifications),
+          companyUpiId: remoteSettings.companyUpiId || DEFAULT_SETTINGS.companyUpiId,
+          companyUpiName: remoteSettings.companyUpiName || DEFAULT_SETTINGS.companyUpiName,
         });
       } catch {
         setToast({ message: "Failed to load settings", type: "error" });
@@ -199,6 +204,8 @@ export default function Settings() {
         email_alerts: settings.emailAlerts,
         sms_alerts: settings.smsAlerts,
         push_notifications: settings.pushNotifications,
+        company_upi_id: settings.companyUpiId,
+        company_upi_name: settings.companyUpiName,
       }, token);
 
       if (!data.success) {
@@ -467,6 +474,46 @@ export default function Settings() {
 
                 <div className="flex justify-end pt-2 border-t border-neutral-100">
                   <button onClick={() => saveSettings("Commission settings")} className="btn-primary">
+                    <Save size={15} /> Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "payments" && (
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Company UPI</h3>
+              </div>
+              <div className="p-6 space-y-5">
+                <p className="text-xs text-neutral-500">
+                  A platform-wide UPI ID drivers can show instead of their own personal one at
+                  collection time — the driver picks which QR to display for each collection, on
+                  their own Payments step.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Company UPI ID">
+                    <input
+                      type="text"
+                      value={settings.companyUpiId}
+                      onChange={(event) => setSettings((current) => ({ ...current, companyUpiId: event.target.value }))}
+                      placeholder="company@okhdfcbank"
+                      className="form-input"
+                    />
+                  </Field>
+                  <Field label="Payee Name shown on the QR">
+                    <input
+                      type="text"
+                      value={settings.companyUpiName}
+                      onChange={(event) => setSettings((current) => ({ ...current, companyUpiName: event.target.value }))}
+                      placeholder="GadiDost Logistics"
+                      className="form-input"
+                    />
+                  </Field>
+                </div>
+                <div className="flex justify-end pt-2 border-t border-neutral-100">
+                  <button onClick={() => saveSettings("Company UPI")} className="btn-primary">
                     <Save size={15} /> Save Changes
                   </button>
                 </div>

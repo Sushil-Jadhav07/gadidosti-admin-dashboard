@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Truck, Save, IndianRupee, Package, TrendingUp, Percent, Clock } from "lucide-react";
+import { Truck, Save, IndianRupee, Package, TrendingUp, Percent, Clock, Wallet, Zap, Timer } from "lucide-react";
 import Toast from "../components/Toast";
 import { api, getToken } from "../services/api";
 
@@ -15,6 +15,32 @@ const DEFAULT_CONFIG = {
   intraCity: { small: { ...DEFAULT_CATEGORY }, medium: { ...DEFAULT_CATEGORY }, large: { ...DEFAULT_CATEGORY } },
   interCity: { baseRatePerKm: 0, fuelSurcharge: 0, platformFee: 0, tollHandling: "actual", tollFixedAmount: 0 },
   partTruck: { platformFee: 0 },
+  // Freight payment stages: "Advance" always offers *some* amount now (no longer gated behind
+  // a minimum booking size) — three tiers by booking amount, first two flat, the top one a
+  // percentage. Mirrors gadidosti-backend's pricing.model.js DEFAULT_ADVANCE_TIERS exactly;
+  // these are just the client-side defaults shown until an admin has ever saved this section.
+  advanceRule: {
+    tiers: [
+      { maxAmount: 5000, type: "flat", value: 1000 },
+      { maxAmount: 10000, type: "flat", value: 2000 },
+      { maxAmount: null, type: "percent", value: 0.8 },
+    ],
+  },
+  // Delivery SLA: distance-tiered expected total delivery time — distinct from
+  // intraCity.<category>.waitingCharge's per-hour rate (reused as-is for the overage amount, no
+  // new rate field) and from the separate inter-city halting grace period above. Mirrors
+  // gadidosti-backend's pricing.model.js DEFAULT_SLA_TIERS exactly.
+  deliverySla: {
+    tiers: [
+      { maxKm: 300, hours: 36 },
+      { maxKm: 1000, hours: 48 },
+      { maxKm: null, hours: 120 },
+    ],
+  },
+  // Express Delivery: intra-city only (confirmed scope) — a surcharge on top of the normal
+  // total, and the normal SLA hours multiplied down for a tighter deadline. Mirrors
+  // gadidosti-backend's pricing.model.js DEFAULT_EXPRESS_SERVICE exactly.
+  expressService: { surchargePct: 0.2, slaFactor: 0.6, includesInsurance: true },
 };
 
 function Spinner({ className = "w-4 h-4 border-2 border-white/30 border-t-white" }) {
@@ -147,6 +173,13 @@ export default function Pricing() {
           },
           interCity: { ...DEFAULT_CONFIG.interCity, ...(remote.interCity || {}) },
           partTruck: { ...DEFAULT_CONFIG.partTruck, ...(remote.partTruck || {}) },
+          advanceRule: {
+            tiers: remote.advanceRule?.tiers?.length === 3 ? remote.advanceRule.tiers : DEFAULT_CONFIG.advanceRule.tiers,
+          },
+          deliverySla: {
+            tiers: remote.deliverySla?.tiers?.length === 3 ? remote.deliverySla.tiers : DEFAULT_CONFIG.deliverySla.tiers,
+          },
+          expressService: { ...DEFAULT_CONFIG.expressService, ...(remote.expressService || {}) },
         });
       } else {
         setError(res.message || "Failed to load pricing configuration");
@@ -190,6 +223,32 @@ export default function Pricing() {
 
   const updatePartTruck = (field, value) => {
     setConfig((current) => ({ ...current, partTruck: { ...current.partTruck, [field]: value } }));
+  };
+
+  // index 0/1 are the two flat tiers (each has its own maxAmount ceiling); index 2 is the
+  // open-ended percent tier above tier 1's ceiling — its own maxAmount always stays null.
+  const updateAdvanceTier = (index, field, value) => {
+    setConfig((current) => ({
+      ...current,
+      advanceRule: {
+        tiers: current.advanceRule.tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier)),
+      },
+    }));
+  };
+
+  // Same 3-tier shape as advanceRule above, keyed by distance instead of amount — index 2's
+  // maxKm always stays null (open-ended, "above Tier 2's distance").
+  const updateSlaTier = (index, field, value) => {
+    setConfig((current) => ({
+      ...current,
+      deliverySla: {
+        tiers: current.deliverySla.tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier)),
+      },
+    }));
+  };
+
+  const updateExpressService = (field, value) => {
+    setConfig((current) => ({ ...current, expressService: { ...current.expressService, [field]: value } }));
   };
 
   if (loading) {
@@ -301,6 +360,153 @@ export default function Pricing() {
         <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
           <button onClick={() => save("partTruck")} disabled={savingSection === "partTruck"} className="btn-primary">
             {savingSection === "partTruck" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Advance Payment Rule */}
+      <SectionShell icon={Wallet} title="Advance Payment Rule" subtitle="How much of the fare must be paid up front when a client chooses 'Advance' instead of Pay Now / To Pay / To Be Billed">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NumberField
+              label="Tier 1 — Up to this amount"
+              prefix="₹"
+              value={config.advanceRule.tiers[0].maxAmount}
+              onChange={(v) => updateAdvanceTier(0, "maxAmount", v)}
+            />
+            <NumberField
+              label="Tier 1 — Flat advance"
+              prefix="₹"
+              value={config.advanceRule.tiers[0].value}
+              onChange={(v) => updateAdvanceTier(0, "value", v)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NumberField
+              label="Tier 2 — Up to this amount"
+              prefix="₹"
+              value={config.advanceRule.tiers[1].maxAmount}
+              onChange={(v) => updateAdvanceTier(1, "maxAmount", v)}
+            />
+            <NumberField
+              label="Tier 2 — Flat advance"
+              prefix="₹"
+              value={config.advanceRule.tiers[1].value}
+              onChange={(v) => updateAdvanceTier(1, "value", v)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Tier 3 — Above Tier 2&apos;s amount</label>
+              <div className="form-input flex items-center text-neutral-400 bg-neutral-50 cursor-not-allowed">
+                Everything above ₹{Number(config.advanceRule.tiers[1].maxAmount || 0).toLocaleString("en-IN")}
+              </div>
+            </div>
+            <NumberField
+              label="Tier 3 — Advance %"
+              suffix="%"
+              value={Math.round(Number(config.advanceRule.tiers[2].value) * 100)}
+              onChange={(v) => updateAdvanceTier(2, "value", Math.max(0, Math.min(100, v)) / 100)}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("advanceRule")} disabled={savingSection === "advanceRule"} className="btn-primary">
+            {savingSection === "advanceRule" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Delivery SLA */}
+      <SectionShell icon={Timer} title="Delivery Time & Delay Charges" subtitle="Expected total delivery time by distance — a delay charge (same rate as Waiting/hr above) applies once a trip runs over its own tier">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NumberField
+              label="Tier 1 — Up to this distance"
+              suffix="km"
+              value={config.deliverySla.tiers[0].maxKm}
+              onChange={(v) => updateSlaTier(0, "maxKm", v)}
+            />
+            <NumberField
+              label="Tier 1 — Expected delivery time"
+              suffix="hrs"
+              value={config.deliverySla.tiers[0].hours}
+              onChange={(v) => updateSlaTier(0, "hours", v)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NumberField
+              label="Tier 2 — Up to this distance"
+              suffix="km"
+              value={config.deliverySla.tiers[1].maxKm}
+              onChange={(v) => updateSlaTier(1, "maxKm", v)}
+            />
+            <NumberField
+              label="Tier 2 — Expected delivery time"
+              suffix="hrs"
+              value={config.deliverySla.tiers[1].hours}
+              onChange={(v) => updateSlaTier(1, "hours", v)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Tier 3 — Above Tier 2&apos;s distance</label>
+              <div className="form-input flex items-center text-neutral-400 bg-neutral-50 cursor-not-allowed">
+                Everything above {Number(config.deliverySla.tiers[1].maxKm || 0).toLocaleString("en-IN")} km
+              </div>
+            </div>
+            <NumberField
+              label="Tier 3 — Expected delivery time"
+              suffix="hrs"
+              value={config.deliverySla.tiers[2].hours}
+              onChange={(v) => updateSlaTier(2, "hours", v)}
+            />
+          </div>
+          <p className="text-xs text-neutral-400">
+            The overage charge reuses each truck category&apos;s existing Waiting/hr rate (Intra-City Pricing above) — no separate rate to configure.
+          </p>
+        </div>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("deliverySla")} disabled={savingSection === "deliverySla"} className="btn-primary">
+            {savingSection === "deliverySla" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Express Delivery */}
+      <SectionShell icon={Zap} title="Express Delivery" subtitle="Intra-city only — a faster, costlier service tier">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NumberField
+              label="Surcharge on normal freight"
+              suffix="%"
+              value={Math.round(Number(config.expressService.surchargePct) * 100)}
+              onChange={(v) => updateExpressService("surchargePct", Math.max(0, v) / 100)}
+            />
+            <NumberField
+              label="Faster than normal SLA"
+              suffix="%"
+              value={Math.round((1 - Number(config.expressService.slaFactor)) * 100)}
+              onChange={(v) => updateExpressService("slaFactor", 1 - Math.max(0, Math.min(100, v)) / 100)}
+            />
+          </div>
+          <p className="text-xs text-neutral-400">
+            E.g. a ₹20,000 normal freight becomes ₹{Math.round(20000 * (1 + Number(config.expressService.surchargePct))).toLocaleString("en-IN")} Express, with the delivery deadline tightened to{" "}
+            {Math.round(Number(config.expressService.slaFactor) * 100)}% of the normal expected time above.
+          </p>
+          <label className="flex items-center gap-2.5 text-sm text-neutral-700">
+            <input
+              type="checkbox"
+              checked={!!config.expressService.includesInsurance}
+              onChange={(e) => updateExpressService("includesInsurance", e.target.checked)}
+              className="w-4 h-4 rounded border-neutral-300 text-primary focus:ring-primary/30"
+            />
+            Include transit insurance with Express bookings (informational badge only — no separate premium calculated)
+          </label>
+        </div>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("expressService")} disabled={savingSection === "expressService"} className="btn-primary">
+            {savingSection === "expressService" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
           </button>
         </div>
       </SectionShell>
