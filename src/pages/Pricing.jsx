@@ -41,6 +41,20 @@ const DEFAULT_CONFIG = {
   // total, and the normal SLA hours multiplied down for a tighter deadline. Mirrors
   // gadidosti-backend's pricing.model.js DEFAULT_EXPRESS_SERVICE exactly.
   expressService: { surchargePct: 0.2, slaFactor: 0.6, includesInsurance: true },
+  // Estimated delivery DATE shown to the client before booking confirmation — a coarse,
+  // day-granularity figure, distinct from deliverySla above (that's hour-precision, used for
+  // delay-charge billing). Four bands instead of three — the confirmed anchors needed one more
+  // tier to resolve cleanly without overlapping ("avoid overlapping ranges"). Mirrors
+  // gadidosti-backend's pricing.model.js DEFAULT_DELIVERY_DATE_TIERS exactly.
+  deliveryDateEstimate: {
+    tiers: [
+      { maxKm: 300, days: 1 },
+      { maxKm: 500, days: 2 },
+      { maxKm: 1000, days: 3 },
+      { maxKm: 2000, days: 4 },
+      { maxKm: null, days: 5 },
+    ],
+  },
 };
 
 function Spinner({ className = "w-4 h-4 border-2 border-white/30 border-t-white" }) {
@@ -180,6 +194,9 @@ export default function Pricing() {
             tiers: remote.deliverySla?.tiers?.length === 3 ? remote.deliverySla.tiers : DEFAULT_CONFIG.deliverySla.tiers,
           },
           expressService: { ...DEFAULT_CONFIG.expressService, ...(remote.expressService || {}) },
+          deliveryDateEstimate: {
+            tiers: remote.deliveryDateEstimate?.tiers?.length === 4 ? remote.deliveryDateEstimate.tiers : DEFAULT_CONFIG.deliveryDateEstimate.tiers,
+          },
         });
       } else {
         setError(res.message || "Failed to load pricing configuration");
@@ -249,6 +266,17 @@ export default function Pricing() {
 
   const updateExpressService = (field, value) => {
     setConfig((current) => ({ ...current, expressService: { ...current.expressService, [field]: value } }));
+  };
+
+  // Same tier-editing shape as updateAdvanceTier/updateSlaTier — four tiers here instead of
+  // three; the last one's maxKm always stays null (open-ended, "above Tier 3's distance").
+  const updateDeliveryDateTier = (index, field, value) => {
+    setConfig((current) => ({
+      ...current,
+      deliveryDateEstimate: {
+        tiers: current.deliveryDateEstimate.tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier)),
+      },
+    }));
   };
 
   if (loading) {
@@ -507,6 +535,47 @@ export default function Pricing() {
         <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
           <button onClick={() => save("expressService")} disabled={savingSection === "expressService"} className="btn-primary">
             {savingSection === "expressService" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Estimated Delivery Date */}
+      <SectionShell icon={Clock} title="Estimated Delivery Date" subtitle="Shown to the client before booking confirmation — a coarse day estimate, separate from the hour-precision Delivery SLA above">
+        <div className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <NumberField
+                label={`Tier ${i + 1} — Up to this distance`}
+                suffix="km"
+                value={config.deliveryDateEstimate.tiers[i].maxKm}
+                onChange={(v) => updateDeliveryDateTier(i, "maxKm", v)}
+              />
+              <NumberField
+                label={`Tier ${i + 1} — Estimated delivery`}
+                suffix="days"
+                value={config.deliveryDateEstimate.tiers[i].days}
+                onChange={(v) => updateDeliveryDateTier(i, "days", v)}
+              />
+            </div>
+          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Tier 4 — Above Tier 3&apos;s distance</label>
+              <div className="form-input flex items-center text-neutral-400 bg-neutral-50 cursor-not-allowed">
+                Everything above {Number(config.deliveryDateEstimate.tiers[2].maxKm || 0).toLocaleString("en-IN")} km
+              </div>
+            </div>
+            <NumberField
+              label="Tier 4 — Estimated delivery"
+              suffix="days"
+              value={config.deliveryDateEstimate.tiers[3].days}
+              onChange={(v) => updateDeliveryDateTier(3, "days", v)}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("deliveryDateEstimate")} disabled={savingSection === "deliveryDateEstimate"} className="btn-primary">
+            {savingSection === "deliveryDateEstimate" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
           </button>
         </div>
       </SectionShell>
