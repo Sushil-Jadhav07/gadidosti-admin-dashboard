@@ -55,6 +55,16 @@ function DocumentPreview({ label, url }) {
   );
 }
 
+function ReviewerFlag({ role, name }) {
+  if (role !== 'broker') return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-indigo-50 text-indigo-700 border-indigo-200 whitespace-nowrap">
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 flex-shrink-0" />
+      Broker Verified{name ? ` — by ${name}` : ''}
+    </span>
+  );
+}
+
 function mapBroker(s) {
   const d = s.documents || {};
   return {
@@ -70,6 +80,8 @@ function mapBroker(s) {
     submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
     status: STATUS_LABEL[s.kyc_status] || s.kyc_status,
     rejectionReason: s.rejection_reason,
+    reviewerName: s.reviewer_name || null,
+    reviewerRole: s.reviewer_role || null,
   };
 }
 
@@ -87,6 +99,8 @@ function mapDriver(s) {
     submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
     status: STATUS_LABEL[s.kyc_status] || s.kyc_status,
     rejectionReason: s.rejection_reason,
+    reviewerName: s.reviewer_name || null,
+    reviewerRole: s.reviewer_role || null,
   };
 }
 
@@ -289,7 +303,12 @@ export default function KYC() {
                       </>
                     )}
                     <td className="whitespace-nowrap">{kyc.submissionDate}</td>
-                    <td><Badge status={kyc.status} /></td>
+                    <td>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge status={kyc.status} />
+                        <ReviewerFlag role={kyc.reviewerRole} name={kyc.reviewerName} />
+                      </div>
+                    </td>
                     <td className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => { setSelectedKYC(kyc); setShowRejectBox(false); }} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="View Documents">
@@ -335,8 +354,9 @@ export default function KYC() {
               </div>
               <div>
                 <h3 className="text-lg font-poppins font-semibold text-secondary">{selectedKYC.name}</h3>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
                   <Badge status={selectedKYC.status} />
+                  <ReviewerFlag role={selectedKYC.reviewerRole} name={selectedKYC.reviewerName} />
                 </div>
               </div>
             </div>
