@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ChevronLeft, Pencil, Trash2, AlertTriangle, CheckCircle2, Circle, XCircle,
   Camera, MessageCircle, User, Building2, MapPin, Package, Truck, Phone,
+  Wrench, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import Badge from '../components/Badge';
 import ChatWindow from '../components/ChatWindow';
+import Modal from '../components/Modal';
 import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 import { STATUS_MAP, money, bookingRef, CATEGORY_COLOR, DeletedBadge, DeleteBookingModal } from './Bookings';
@@ -21,6 +23,11 @@ const TIMELINE_STEPS = [
   { key: 'delivered', label: 'Delivered' },
   { key: 'completed', label: 'Completed' },
 ];
+
+// The trip's own status enum (distinct from the booking's — no 'pending'/'assigned'), in the
+// order it can only move forward through. Used to build the "what can this become next"
+// dropdown in ManageTripSection — 'cancelled' is always offered separately as an escape hatch.
+const TRIP_STATUS_ORDER = ['confirmed', 'en_route_pickup', 'picked_up', 'in_transit', 'delivered', 'completed'];
 
 function PhoneLink({ phone }) {
   if (!phone) return null;
@@ -91,6 +98,218 @@ function StatusTimeline({ status }) {
   );
 }
 
+// Admin/broker override panel — the trip normally only advances via the driver's own app;
+// this exists purely so a stuck/unreachable driver (dead phone, crashed app, etc.) doesn't
+// leave the trip stranded. Fetches the trip fresh (on expand, and again after every action)
+// rather than trusting `booking` for trip-level fields like `stops`, which the booking
+// payload doesn't carry. Extra loading/unloading stops must be completed in order within
+// each type — mirrored here so "Mark complete" only ever shows on the one that's actually
+// next, matching the 409 the backend would otherwise return.
+function ManageTripSection({ booking, onToast, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const [trip, setTrip] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [completingIndex, setCompletingIndex] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchTrip = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get(`/api/trips/booking/${booking.id}`, getToken());
+      if (res.success && res.data?.trip) {
+        setTrip(res.data.trip);
+      } else {
+        setTrip(null);
+        setError(res.message || 'No trip found for this booking yet.');
+      }
+    } catch {
+      setTrip(null);
+      setError('Network error — could not load trip.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleOpen = () => {
+    const next = !open;
+    setOpen(next);
+    if (next) fetchTrip();
+  };
+
+  const handleCompleteStop = async (index) => {
+    setCompletingIndex(index);
+    try {
+      const res = await api.patch(`/api/trips/${trip.id}/stops/${index}/complete`, {}, getToken());
+      if (res.success) {
+        onToast({ message: 'Stop marked complete.', type: 'success' });
+        await fetchTrip();
+      } else {
+        onToast({ message: res.message || 'Failed to complete stop.', type: 'error' });
+      }
+    } catch {
+      onToast({ message: 'Network error — could not complete stop.', type: 'error' });
+    } finally {
+      setCompletingIndex(null);
+    }
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!trip || !selectedStatus) return;
+    setSubmitting(true);
+    try {
+      const res = await api.patch(`/api/trips/${trip.id}/status`, { status: selectedStatus }, getToken());
+      if (res.success) {
+        onToast({ message: `Trip status set to ${STATUS_MAP[selectedStatus] || selectedStatus}.`, type: 'success' });
+        setConfirmOpen(false);
+        setSelectedStatus('');
+        await fetchTrip();
+        onChanged();
+      } else {
+        onToast({ message: res.message || 'Failed to update trip status.', type: 'error' });
+      }
+    } catch {
+      onToast({ message: 'Network error — could not update trip status.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const stops = Array.isArray(trip?.stops) ? trip.stops : [];
+  const extraStops = stops
+    .map((stop, index) => ({ ...stop, index }))
+    .filter((stop) => stop.type === 'loading' || stop.type === 'unloading');
+  const earliestPendingByType = {};
+  extraStops.forEach((stop) => {
+    if (stop.status !== 'done' && earliestPendingByType[stop.type] === undefined) {
+      earliestPendingByType[stop.type] = stop.index;
+    }
+  });
+
+  const currentIndex = trip ? TRIP_STATUS_ORDER.indexOf(trip.status) : -1;
+  const statusOptions = trip && currentIndex !== -1
+    ? [...TRIP_STATUS_ORDER.slice(currentIndex + 1), 'cancelled']
+    : [];
+
+  return (
+    <div className="border border-amber-200 bg-amber-50/40 rounded-2xl overflow-hidden">
+      <button onClick={toggleOpen} className="w-full flex items-center justify-between gap-2.5 p-4 hover:bg-amber-50 transition-colors">
+        <span className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+            <Wrench size={15} />
+          </div>
+          <span className="text-sm font-poppins font-semibold text-secondary">Manage Trip · Driver Unreachable</span>
+        </span>
+        {open ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
+      </button>
+
+      {open && (
+        <div className="p-4 border-t border-amber-200 space-y-4">
+          <p className="text-xs text-neutral-500">
+            Only use this to move the trip forward on the driver's behalf if they're stuck or unreachable
+            (dead phone, crashed app, etc.). Every action below overrides the driver's own app.
+          </p>
+
+          {loading && <div className="text-sm text-neutral-400">Loading trip...</div>}
+          {!loading && error && <div className="text-sm text-danger">{error}</div>}
+
+          {!loading && trip && (
+            <>
+              <div className="flex items-center justify-between text-sm bg-white rounded-xl p-3">
+                <span className="text-neutral-500">Current trip status</span>
+                <Badge status={STATUS_MAP[trip.status] || trip.status} />
+              </div>
+
+              {extraStops.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Loading / Unloading Stops</p>
+                  {extraStops.map((stop) => {
+                    const isDone = stop.status === 'done';
+                    const isNext = earliestPendingByType[stop.type] === stop.index;
+                    return (
+                      <div key={stop.index} className="flex items-center justify-between gap-3 text-sm bg-white rounded-xl p-3">
+                        <div>
+                          <span className="font-medium text-neutral-700 capitalize">{stop.type}</span>
+                          <span className="text-neutral-400"> · {stop.location || '—'}</span>
+                        </div>
+                        {isDone ? (
+                          <span className="flex items-center gap-1 text-tertiary text-xs font-semibold flex-shrink-0">
+                            <CheckCircle2 size={13} /> Done
+                          </span>
+                        ) : isNext ? (
+                          <button
+                            onClick={() => handleCompleteStop(stop.index)}
+                            disabled={completingIndex === stop.index}
+                            className="btn-secondary !py-1.5 !px-3 text-xs disabled:opacity-60 flex-shrink-0"
+                          >
+                            {completingIndex === stop.index ? 'Completing...' : 'Mark complete'}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-neutral-400 flex-shrink-0">Waiting on earlier {stop.type} stop</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {statusOptions.length > 0 ? (
+                <div className="space-y-2 pt-2 border-t border-amber-200">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Override Trip Status</p>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      className="form-select flex-1"
+                    >
+                      <option value="">Select new status...</option>
+                      {statusOptions.map((s) => (
+                        <option key={s} value={s}>{STATUS_MAP[s] || s}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setConfirmOpen(true)}
+                      disabled={!selectedStatus}
+                      className="btn-primary !py-2 !px-3 text-sm disabled:opacity-50 flex-shrink-0"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-400">This trip has no further status to move to.</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <Modal isOpen={confirmOpen} onClose={() => (submitting ? null : setConfirmOpen(false))} title="Override Trip Status" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800 font-medium">
+              This overrides the driver's own status update — only use this if the driver can't act themselves.
+            </p>
+          </div>
+          <p className="text-sm text-neutral-600">
+            Set this trip's status to <span className="font-semibold text-neutral-800">{STATUS_MAP[selectedStatus] || selectedStatus}</span>?
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setConfirmOpen(false)} disabled={submitting} className="btn-secondary disabled:opacity-60">Cancel</button>
+            <button onClick={handleConfirmStatusChange} disabled={submitting} className="btn-danger disabled:opacity-60">
+              {submitting ? 'Updating...' : 'Confirm Override'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 function PricingBreakdown({ pricing, amount }) {
   const base = pricing?.baseFare ?? pricing?.base_fare ?? 0;
   const fuel = pricing?.fuel ?? pricing?.fuelSurcharge ?? 0;
@@ -155,14 +374,22 @@ export default function ViewBooking() {
     return () => { cancelled = true; };
   }, [id, booking]);
 
+  // Silent re-fetch, shared by the live socket push below and by ManageTripSection's status
+  // override — an admin-driven status change doesn't go through the socket's own driver/broker
+  // path, so the override handler calls this directly to make the read-only timeline/badge
+  // reflect it immediately, same as a driver-driven change would.
+  const refreshBooking = useCallback(() => {
+    return api.get(`/api/bookings/${id}`, getToken())
+      .then((res) => { if (res?.success && res.data?.booking) setBooking(res.data.booking); })
+      .catch(() => {});
+  }, [id]);
+
   // Live push — the moment a driver/broker changes this trip's status, silently re-fetch so the
   // timeline/status badge update instantly instead of needing a manual reload. Booking was
   // previously only ever fetched once (see the effect above, guarded on `if (booking) return`).
   useTripStatusSocket((trip) => {
     if (!trip?.bookingId || trip.bookingId !== id) return;
-    api.get(`/api/bookings/${id}`, getToken())
-      .then((res) => { if (res?.success && res.data?.booking) setBooking(res.data.booking); })
-      .catch(() => {});
+    refreshBooking();
   });
 
   // Arriving from the Chats list opens straight to the conversation instead of making
@@ -319,6 +546,10 @@ export default function ViewBooking() {
             </div>
             <span className="text-sm font-medium text-neutral-700">{loadingPod ? 'Loading...' : 'View Proof of Delivery'}</span>
           </button>
+        )}
+
+        {booking.status !== 'completed' && booking.status !== 'cancelled' && (
+          <ManageTripSection booking={booking} onToast={setToast} onChanged={refreshBooking} />
         )}
 
         <div ref={chatSectionRef}>
