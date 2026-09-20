@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Eye, PauseCircle, PlayCircle, ChevronLeft, ChevronRight, Building2, Phone } from 'lucide-react';
+import { Search, Eye, PauseCircle, PlayCircle, ChevronLeft, ChevronRight, Building2, Phone, Pencil, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
@@ -22,6 +22,14 @@ export default function Brokers() {
   const [actionLoading, setActionLoading] = useState(null);
   const [toast, setToast] = useState(null);
   const itemsPerPage = 10;
+
+  const [editBroker, setEditBroker] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '', address: '' });
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchBrokers = useCallback(async () => {
     setLoading(true);
@@ -52,6 +60,8 @@ export default function Brokers() {
           id: u.id,
           name: u.name,
           phone: u.phone,
+          email: u.email,
+          address: u.address,
           status: u.status,
           kycStatus: u.kyc_status,
           fleetSize: ownTrucks.length,
@@ -104,6 +114,55 @@ export default function Brokers() {
       setToast({ message: 'Network error — could not update broker status', type: 'error' });
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const openEditBroker = (broker) => {
+    setEditBroker(broker);
+    setEditForm({ name: broker.name || '', email: broker.email || '', address: broker.address || '' });
+    setEditError('');
+  };
+
+  const handleSaveEditBroker = async () => {
+    if (!editBroker) return;
+    if (!editForm.name.trim()) {
+      setEditError('Name cannot be blank.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const res = await api.patch(`/api/admin/users/${editBroker.id}`, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim() || undefined,
+        address: editForm.address.trim() || undefined,
+      }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to update broker');
+      setBrokers((prev) => prev.map((b) => b.id === editBroker.id ? { ...b, name: res.data.user.name, email: res.data.user.email, address: res.data.user.address } : b));
+      setSelectedBroker((prev) => prev && prev.id === editBroker.id ? { ...prev, name: res.data.user.name, email: res.data.user.email, address: res.data.user.address } : prev);
+      setEditBroker(null);
+      setToast({ message: 'Broker updated successfully', type: 'success' });
+    } catch (err) {
+      setEditError(err.message || 'Network error — could not update broker');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/admin/users/${deleteTarget.id}`, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to delete broker');
+      setBrokers((prev) => prev.filter((b) => b.id !== deleteTarget.id));
+      if (selectedBroker?.id === deleteTarget.id) setSelectedBroker(null);
+      setDeleteTarget(null);
+      setToast({ message: 'Broker deleted successfully', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Network error — could not delete broker', type: 'error' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -188,6 +247,12 @@ export default function Brokers() {
                       >
                         {broker.status === 'blocked' ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
                       </button>
+                      <button onClick={() => openEditBroker(broker)} className="p-1.5 text-neutral-500 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors" title="Edit Broker">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => setDeleteTarget(broker)} className="p-1.5 text-danger bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title="Delete Broker">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -233,15 +298,68 @@ export default function Brokers() {
               <div className="flex justify-between"><span className="text-neutral-500">Active Trucks</span><span className="font-medium">{selectedBroker.activeTrucks} trucks</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Total Earnings</span><span className="font-medium">&#8377;{selectedBroker.totalEarnings.toLocaleString('en-IN')}</span></div>
             </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => handleToggleBlock(selectedBroker)}
-                disabled={actionLoading === selectedBroker.id}
-                className={selectedBroker.status === 'blocked' ? 'btn-success disabled:opacity-40' : 'btn-danger disabled:opacity-40'}
-              >
-                {selectedBroker.status === 'blocked' ? <><PlayCircle size={16} /> Reinstate</> : <><PauseCircle size={16} /> Suspend</>}
+            <div className="flex justify-between gap-2">
+              <button onClick={() => setDeleteTarget(selectedBroker)} className="flex items-center gap-1.5 text-sm py-2 px-4 rounded-xl text-danger hover:bg-red-50 transition-colors font-medium">
+                <Trash2 size={14} /> Delete
               </button>
-              <button onClick={() => setSelectedBroker(null)} className="btn-secondary">Close</button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openEditBroker(selectedBroker)}
+                  className="flex items-center gap-1.5 text-sm py-2 px-4 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors font-medium"
+                >
+                  <Pencil size={14} /> Edit
+                </button>
+                <button
+                  onClick={() => handleToggleBlock(selectedBroker)}
+                  disabled={actionLoading === selectedBroker.id}
+                  className={selectedBroker.status === 'blocked' ? 'btn-success disabled:opacity-40' : 'btn-danger disabled:opacity-40'}
+                >
+                  {selectedBroker.status === 'blocked' ? <><PlayCircle size={16} /> Reinstate</> : <><PauseCircle size={16} /> Suspend</>}
+                </button>
+                <button onClick={() => setSelectedBroker(null)} className="btn-secondary">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Broker Modal */}
+      <Modal isOpen={!!editBroker} onClose={() => setEditBroker(null)} title="Edit Broker" size="sm">
+        {editBroker && (
+          <div className="space-y-4">
+            <div>
+              <label className="form-label">Name</label>
+              <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Email</label>
+              <input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Address</label>
+              <textarea value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} rows={2} className="form-input resize-none" />
+            </div>
+            <p className="text-xs text-neutral-400">Phone number isn&apos;t editable here — it&apos;s the OTP-verified login identifier.</p>
+            {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEditBroker(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleSaveEditBroker} disabled={savingEdit} className="btn-primary disabled:opacity-50">{savingEdit ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirm Modal */}
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Broker" size="sm">
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              Are you sure you want to delete <span className="font-semibold text-neutral-800">{deleteTarget.name}</span>?
+              This will deactivate their account{deleteTarget.fleetSize > 0 ? ` — they currently have ${deleteTarget.fleetSize} truck${deleteTarget.fleetSize === 1 ? '' : 's'} in their fleet` : ''}.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="btn-danger disabled:opacity-50">{deleting ? 'Deleting...' : 'Delete Broker'}</button>
             </div>
           </div>
         )}

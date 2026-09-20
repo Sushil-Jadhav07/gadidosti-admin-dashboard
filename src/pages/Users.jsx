@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search, Eye, Ban, UserCheck, Trash2, CheckCircle2, XCircle,
-  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, X, Filter,
+  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, X, Filter, Pencil,
 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
@@ -70,6 +70,11 @@ export default function Users() {
   const [actionLoading, setActionLoading] = useState(null);
   const [toast, setToast]               = useState(null);
   const searchTimer = useRef(null);
+
+  const [editUser, setEditUser] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '', address: '', companyName: '' });
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -152,6 +157,44 @@ export default function Users() {
       showToast('Network error — could not delete user', 'error');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const openEditUser = (user) => {
+    setEditUser(user);
+    setEditForm({
+      name: user.name || '',
+      email: user.email || '',
+      address: user.address || '',
+      companyName: user.company_name || '',
+    });
+    setEditError('');
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!editUser) return;
+    if (!editForm.name.trim()) {
+      setEditError('Name cannot be blank.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const data = await api.patch(`/api/admin/users/${editUser.id}`, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim() || undefined,
+        address: editForm.address.trim() || undefined,
+        company_name: editForm.companyName.trim() || undefined,
+      }, getToken());
+      if (!data.success) throw new Error(data.message || 'Failed to update user');
+      setUsers((prev) => prev.map((u) => u.id === editUser.id ? { ...u, ...data.data.user } : u));
+      setSelectedUser((u) => (u && u.id === editUser.id ? { ...u, ...data.data.user } : u));
+      setEditUser(null);
+      showToast('User updated successfully');
+    } catch (err) {
+      setEditError(err.message || 'Network error — could not update user');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -539,6 +582,12 @@ export default function Users() {
 
             <div className="flex justify-between gap-2 pt-1">
               <div className="flex gap-2">
+                <button
+                  onClick={() => openEditUser(selectedUser)}
+                  className="flex items-center gap-1.5 text-sm py-2 px-4 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors font-medium"
+                >
+                  <Pencil size={14} /> Edit
+                </button>
                 {selectedUser.status === 'active' && (
                   <button
                     onClick={() => { handleStatusChange(selectedUser.id, 'blocked'); setSelectedUser(null); }}
@@ -557,6 +606,38 @@ export default function Users() {
                 )}
               </div>
               <button onClick={() => setSelectedUser(null)} className="btn-secondary">Close</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal isOpen={!!editUser} onClose={() => setEditUser(null)} title="Edit User" size="sm">
+        {editUser && (
+          <div className="space-y-4">
+            <div>
+              <label className="form-label">Name</label>
+              <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Email</label>
+              <input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="form-input" />
+            </div>
+            {editUser.role === 'client' && (
+              <div>
+                <label className="form-label">Company Name</label>
+                <input value={editForm.companyName} onChange={(e) => setEditForm((f) => ({ ...f, companyName: e.target.value }))} className="form-input" />
+              </div>
+            )}
+            <div>
+              <label className="form-label">Address</label>
+              <textarea value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} rows={2} className="form-input resize-none" />
+            </div>
+            <p className="text-xs text-neutral-400">Phone number isn&apos;t editable here — it&apos;s the OTP-verified login identifier.</p>
+            {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEditUser(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleSaveEditUser} disabled={savingEdit} className="btn-primary disabled:opacity-50">{savingEdit ? 'Saving...' : 'Save Changes'}</button>
             </div>
           </div>
         )}

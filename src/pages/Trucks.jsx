@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, Truck, Plus, CheckCircle2, Navigation, Wrench, LayoutGrid, List } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Truck, Plus, CheckCircle2, Navigation, Wrench, LayoutGrid, List, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
@@ -15,6 +15,8 @@ const STATUS_META = {
 };
 const STATUS_LABEL = Object.fromEntries(Object.entries(STATUS_META).map(([k, v]) => [k, v.label]));
 const STATUS_OPTIONS = Object.keys(STATUS_META);
+// Mirrors gadidosti-backend's vehicle.validation.js TRUCK_CATEGORIES — keep in sync.
+const CATEGORY_OPTIONS = ['small', 'medium', 'large', 'part'];
 
 function isInsuranceExpiring(dateStr) {
   if (!dateStr) return false;
@@ -75,10 +77,15 @@ export default function Trucks() {
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTruck, setSelectedTruck] = useState(null);
-  const [statusDraft, setStatusDraft] = useState('');
-  const [savingStatus, setSavingStatus] = useState(false);
   const [toast, setToast] = useState(null);
   const itemsPerPage = 9;
+
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchTrucks = useCallback(async () => {
     setLoading(true);
@@ -122,28 +129,64 @@ export default function Trucks() {
     return counts;
   }, [trucks]);
 
+  // mapTruck substitutes '—' for any missing type/make/year/capacity for display purposes —
+  // that placeholder must never leak into an editable input as if it were real data.
+  const stripPlaceholder = (v) => (v === '—' ? '' : v ?? '');
+
   const openTruck = (truck) => {
     setSelectedTruck(truck);
-    setStatusDraft(truck.status);
+    setEditForm({
+      category: truck.category || '',
+      capacity: stripPlaceholder(truck.capacity),
+      type: stripPlaceholder(truck.type),
+      make: stripPlaceholder(truck.make),
+      year: stripPlaceholder(truck.year),
+      insuranceExpiry: truck.insuranceExpiry ? String(truck.insuranceExpiry).slice(0, 10) : '',
+      status: truck.status,
+    });
+    setEditError('');
   };
 
-  const handleUpdateStatus = async () => {
-    if (!selectedTruck || statusDraft === selectedTruck.status) return;
-    setSavingStatus(true);
+  const handleSaveEdit = async () => {
+    if (!selectedTruck || !editForm) return;
+    setSavingEdit(true);
+    setEditError('');
     try {
-      const res = await api.patch(`/api/vehicles/trucks/${selectedTruck.id}`, { status: statusDraft }, getToken());
-      if (res.success) {
-        const updated = mapTruck(res.data.truck);
-        setTrucks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
-        setSelectedTruck(updated);
-        setToast({ message: `${updated.regNo} status updated to ${updated.statusLabel}`, type: 'success' });
-      } else {
-        setToast({ message: res.message || 'Failed to update truck status', type: 'error' });
-      }
-    } catch {
-      setToast({ message: 'Network error — could not update truck status', type: 'error' });
+      const res = await api.patch(`/api/vehicles/trucks/${selectedTruck.id}`, {
+        category: editForm.category || undefined,
+        capacity: editForm.capacity.trim() || undefined,
+        type: editForm.type.trim() || undefined,
+        make: editForm.make.trim() || undefined,
+        year: editForm.year ? Number(editForm.year) : undefined,
+        insurance_expiry: editForm.insuranceExpiry || undefined,
+        status: editForm.status || undefined,
+      }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to update truck');
+      const updated = mapTruck(res.data.truck);
+      setTrucks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+      setSelectedTruck(updated);
+      setToast({ message: `${updated.regNo} updated successfully`, type: 'success' });
+    } catch (err) {
+      setEditError(err.message || 'Network error — could not update truck');
     } finally {
-      setSavingStatus(false);
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/vehicles/trucks/${deleteTarget.id}`, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to delete truck');
+      setTrucks((prev) => prev.filter((t) => t.id !== deleteTarget.id));
+      if (selectedTruck?.id === deleteTarget.id) setSelectedTruck(null);
+      setDeleteTarget(null);
+      setToast({ message: 'Truck deleted successfully', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Network error — could not delete truck', type: 'error' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -378,8 +421,8 @@ export default function Trucks() {
         </>
       )}
 
-      <Modal isOpen={!!selectedTruck} onClose={() => setSelectedTruck(null)} title="Truck Details" size="md">
-        {selectedTruck && (
+      <Modal isOpen={!!selectedTruck} onClose={() => setSelectedTruck(null)} title="Edit Truck" size="md">
+        {selectedTruck && editForm && (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -394,40 +437,87 @@ export default function Trucks() {
                 <Badge status={selectedTruck.statusLabel} />
               </div>
             </div>
-            <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-neutral-500">Truck ID</span><span className="font-medium">{shortId(selectedTruck.id)}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Registration Number</span><span className="font-medium">{selectedTruck.regNo}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Type</span><span className="font-medium">{selectedTruck.type}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Make</span><span className="font-medium">{selectedTruck.make}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Year</span><span className="font-medium">{selectedTruck.year}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Capacity</span><span className="font-medium">{selectedTruck.capacity}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Broker</span><span className="font-medium">{selectedTruck.broker}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Driver</span><span className="font-medium">{selectedTruck.driver}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Last Trip</span><span className="font-medium">{formatDate(selectedTruck.lastTrip)}</span></div>
-              <div className="flex justify-between">
-                <span className="text-neutral-500">Insurance Expiry</span>
-                <span className={`font-medium ${isInsuranceExpiring(selectedTruck.insuranceExpiry) ? 'text-danger' : ''}`}>{formatDate(selectedTruck.insuranceExpiry)}</span>
+
+            <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
+              <span className="text-neutral-500">Truck ID</span><span className="font-medium">{shortId(selectedTruck.id)}</span>
+            </div>
+            <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
+              <span className="text-neutral-500">Broker</span><span className="font-medium">{selectedTruck.broker}</span>
+            </div>
+            <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
+              <span className="text-neutral-500">Driver</span><span className="font-medium">{selectedTruck.driver}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Category</label>
+                <select value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))} className="form-select">
+                  {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Capacity</label>
+                <input value={editForm.capacity} onChange={(e) => setEditForm((f) => ({ ...f, capacity: e.target.value }))} className="form-input" placeholder="e.g. 10 tons" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Type</label>
+                <input value={editForm.type} onChange={(e) => setEditForm((f) => ({ ...f, type: e.target.value }))} className="form-input" placeholder="e.g. Large Truck" />
+              </div>
+              <div>
+                <label className="form-label">Make</label>
+                <input value={editForm.make} onChange={(e) => setEditForm((f) => ({ ...f, make: e.target.value }))} className="form-input" placeholder="e.g. Tata Ace" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Year</label>
+                <input type="number" value={editForm.year} onChange={(e) => setEditForm((f) => ({ ...f, year: e.target.value }))} className="form-input" placeholder="e.g. 2022" />
+              </div>
+              <div>
+                <label className="form-label">Insurance Expiry</label>
+                <input type="date" value={editForm.insuranceExpiry} onChange={(e) => setEditForm((f) => ({ ...f, insuranceExpiry: e.target.value }))} className="form-input" />
               </div>
             </div>
 
             <div>
-              <label className="form-label">Update Status</label>
-              <div className="flex items-center gap-2">
-                <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)} className="form-select">
-                  {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                </select>
-                <button
-                  onClick={handleUpdateStatus}
-                  disabled={savingStatus || statusDraft === selectedTruck.status}
-                  className="btn-primary whitespace-nowrap disabled:opacity-40"
-                >
-                  {savingStatus ? 'Saving...' : 'Update'}
-                </button>
-              </div>
+              <label className="form-label">Status</label>
+              <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="form-select">
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
             </div>
 
+            {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <button
+                onClick={() => { setDeleteTarget(selectedTruck); setSelectedTruck(null); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-danger hover:bg-red-50 transition-colors text-sm font-semibold"
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setSelectedTruck(null)} className="btn-secondary">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={savingEdit} className="btn-primary disabled:opacity-50">{savingEdit ? 'Saving...' : 'Save Changes'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Truck" size="sm">
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              Are you sure you want to delete <span className="font-semibold text-neutral-800">{deleteTarget.regNo}</span>?
+              This cannot be undone if it has no booking history — otherwise mark it under maintenance instead.
+            </p>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setSelectedTruck(null)} className="btn-secondary">Close</button>
+              <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="btn-danger disabled:opacity-50">{deleting ? 'Deleting...' : 'Delete Truck'}</button>
             </div>
           </div>
         )}

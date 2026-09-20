@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, Phone, Mail, Truck, Plus, MoreVertical, LayoutGrid, List } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Mail, Truck, Plus, MoreVertical, LayoutGrid, List, Pencil, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
+import Modal from '../components/Modal';
+import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 
 const STATUS_LABEL = { available: 'Available', on_trip: 'On Route', offline: 'Off Duty' };
@@ -70,6 +72,15 @@ export default function Drivers() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(9);
   const [selectedDriver, setSelectedDriver] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({ licenseNo: '', licenseExpiry: '', aadhaar: '', status: 'available' });
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
@@ -93,6 +104,63 @@ export default function Drivers() {
   useEffect(() => {
     if (!selectedDriver && drivers.length > 0) setSelectedDriver(drivers[0]);
   }, [drivers, selectedDriver]);
+
+  // mapDriver substitutes '—' for a missing licenseNo/aadhaar for display purposes — that
+  // placeholder must never leak into an editable input as if it were real data, so it's
+  // stripped back out here rather than reused directly from the mapped driver object.
+  const openEdit = (driver) => {
+    setEditTarget(driver);
+    setEditForm({
+      licenseNo: driver.licenseNo === '—' ? '' : driver.licenseNo || '',
+      licenseExpiry: driver.licenseExpiry ? String(driver.licenseExpiry).slice(0, 10) : '',
+      aadhaar: '',
+      status: driver.status || 'available',
+    });
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    if (editForm.aadhaar && !/^\d{12}$/.test(editForm.aadhaar)) {
+      setEditError('Aadhaar must be exactly 12 digits.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const res = await api.patch(`/api/vehicles/drivers/${editTarget.id}`, {
+        license_no: editForm.licenseNo.trim() || undefined,
+        license_expiry: editForm.licenseExpiry || undefined,
+        aadhaar: editForm.aadhaar || undefined,
+        status: editForm.status || undefined,
+      }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to update driver');
+      await fetchDrivers();
+      setEditTarget(null);
+      setToast({ message: 'Driver updated successfully', type: 'success' });
+    } catch (err) {
+      setEditError(err.message || 'Network error — could not update driver');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/vehicles/drivers/${deleteTarget.id}`, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to delete driver');
+      setDrivers((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      if (selectedDriver?.id === deleteTarget.id) setSelectedDriver(null);
+      setDeleteTarget(null);
+      setToast({ message: 'Driver deleted successfully', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Network error — could not delete driver', type: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const statusCounts = useMemo(() => {
     const counts = { available: 0, on_trip: 0, offline: 0 };
@@ -339,10 +407,80 @@ export default function Drivers() {
                 <div className="flex justify-between"><span className="text-neutral-500">Assigned Truck</span><span className="font-medium">{selectedDriver.truckReg || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-neutral-500">Total Trips</span><span className="font-medium">{selectedDriver.totalTrips}</span></div>
               </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button onClick={() => openEdit(selectedDriver)} className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors text-sm font-semibold">
+                  <Pencil size={13} /> Edit
+                </button>
+                <button onClick={() => setDeleteTarget(selectedDriver)} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-danger hover:bg-red-50 transition-colors text-sm font-semibold">
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title="Edit Driver" size="sm">
+        {editTarget && (
+          <div className="space-y-4">
+            <div className="bg-neutral-50 rounded-xl p-3 flex items-center gap-3">
+              <DriverAvatar driver={editTarget} size="w-9 h-9" />
+              <div>
+                <p className="text-sm font-semibold text-secondary">{editTarget.name}</p>
+                <p className="text-xs text-neutral-500">{editTarget.phone}</p>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">License Number</label>
+              <input value={editForm.licenseNo} onChange={(e) => setEditForm((f) => ({ ...f, licenseNo: e.target.value }))} className="form-input" placeholder="MH-2020123456789" />
+            </div>
+            <div>
+              <label className="form-label">License Expiry</label>
+              <input type="date" value={editForm.licenseExpiry} onChange={(e) => setEditForm((f) => ({ ...f, licenseExpiry: e.target.value }))} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Aadhaar</label>
+              <input
+                value={editForm.aadhaar}
+                onChange={(e) => setEditForm((f) => ({ ...f, aadhaar: e.target.value.replace(/\D/g, '').slice(0, 12) }))}
+                className="form-input font-mono"
+                placeholder={editTarget.aadhaar !== '—' ? editTarget.aadhaar : 'XXXXXXXXXXXX'}
+                inputMode="numeric"
+              />
+              <p className="text-xs text-neutral-400 mt-1">Leave blank to keep the current Aadhaar on file.</p>
+            </div>
+            <div>
+              <label className="form-label">Status</label>
+              <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="form-select">
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
+            </div>
+            {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEditTarget(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={savingEdit} className="btn-primary disabled:opacity-50">{savingEdit ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Driver" size="sm">
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              Are you sure you want to delete <span className="font-semibold text-neutral-800">{deleteTarget.name}</span>?
+              This cannot be undone if they have no booking history — otherwise the driver will need to be removed from active fleet duty instead.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="btn-danger disabled:opacity-50">{deleting ? 'Deleting...' : 'Delete Driver'}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
