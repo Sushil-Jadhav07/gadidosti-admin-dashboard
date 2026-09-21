@@ -9,6 +9,7 @@ import Badge from '../components/Badge';
 import ChatWindow from '../components/ChatWindow';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
+import PodGallery from '../components/PodGallery';
 import { api, getToken } from '../services/api';
 import { STATUS_MAP, money, bookingRef, CATEGORY_COLOR, DeletedBadge, DeleteBookingModal } from './Bookings';
 import { useTripStatusSocket } from '../hooks/useTripStatusSocket';
@@ -535,7 +536,14 @@ export default function ViewBooking() {
 
         <PricingBreakdown pricing={booking.pricing} amount={booking.amount} />
 
-        {booking.podUrl && (
+        {booking.podMedia?.length > 0 ? (
+          <div className="card p-4">
+            <p className="text-sm font-medium text-neutral-700 mb-2.5 flex items-center gap-2">
+              <Camera size={16} className="text-primary" /> Proof of Delivery
+            </p>
+            <PodGallery media={booking.podMedia} token={getToken()} />
+          </div>
+        ) : booking.podUrl && (
           <button
             onClick={viewProofOfDelivery}
             disabled={loadingPod}
