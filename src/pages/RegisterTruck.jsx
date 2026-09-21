@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CalendarClock, CircleGauge, ShieldCheck, Truck, TruckIcon, Waypoints } from 'lucide-react';
 import BrokerPicker from '../components/BrokerPicker';
 import Toast from '../components/Toast';
+import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 import { TRUCK_IMAGES } from '../lib/truckImages';
 
@@ -104,9 +105,11 @@ export default function RegisterTruck() {
               </div>
               <div>
                 <label className="form-label">Truck Type *</label>
-                <select value={form.category} onChange={(event) => setField('category', event.target.value)} className="form-select">
-                  {TRUCK_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat[0].toUpperCase() + cat.slice(1)}</option>)}
-                </select>
+                <SelectDropdown
+                  options={TRUCK_CATEGORIES.map((cat) => ({ value: cat, label: cat[0].toUpperCase() + cat.slice(1) }))}
+                  value={form.category}
+                  onChange={(v) => setField('category', v)}
+                />
               </div>
               <div>
                 <label className="form-label">Capacity *</label>

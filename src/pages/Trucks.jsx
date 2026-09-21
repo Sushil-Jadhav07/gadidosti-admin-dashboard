@@ -5,6 +5,7 @@ import Badge from '../components/Badge';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
+import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 import { TRUCK_IMAGES } from '../lib/truckImages';
 
@@ -15,8 +16,15 @@ const STATUS_META = {
 };
 const STATUS_LABEL = Object.fromEntries(Object.entries(STATUS_META).map(([k, v]) => [k, v.label]));
 const STATUS_OPTIONS = Object.keys(STATUS_META);
-// Mirrors gadidosti-backend's vehicle.validation.js TRUCK_CATEGORIES — keep in sync.
-const CATEGORY_OPTIONS = ['small', 'medium', 'large', 'part'];
+// Same three options as the broker panel's truck form. 'part' is still valid server-side
+// (vehicle.validation.js TRUCK_CATEGORIES) — a truck that already has it keeps it as an extra
+// option in the edit form (see typeOptionsFor) rather than being silently switched to another.
+const TYPE_OPTIONS = ['small', 'medium', 'large'];
+const typeLabel = (v) => (v ? v.charAt(0).toUpperCase() + v.slice(1) : '');
+const typeOptionsFor = (current) =>
+  (current && !TYPE_OPTIONS.includes(current) ? [...TYPE_OPTIONS, current] : TYPE_OPTIONS)
+    .map((v) => ({ value: v, label: typeLabel(v) }));
+const STATUS_DROPDOWN_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }));
 
 function isInsuranceExpiring(dateStr) {
   if (!dateStr) return false;
@@ -52,7 +60,10 @@ function mapTruck(t) {
   return {
     id: t.id,
     regNo: t.registration,
-    type: t.type || '—',
+    // The broker panel and RegisterTruck both save type and category as the same value, so the
+    // category is the reliable label — showing the free-text `type` column left the table stale
+    // after an edit (older rows can hold something like "Large Truck" there).
+    type: typeLabel(t.category) || t.type || '—',
     category: t.category,
     make: t.make || '—',
     year: t.year || '—',
@@ -136,9 +147,8 @@ export default function Trucks() {
   const openTruck = (truck) => {
     setSelectedTruck(truck);
     setEditForm({
-      category: truck.category || '',
+      category: truck.category || 'small',
       capacity: stripPlaceholder(truck.capacity),
-      type: stripPlaceholder(truck.type),
       make: stripPlaceholder(truck.make),
       year: stripPlaceholder(truck.year),
       insuranceExpiry: truck.insuranceExpiry ? String(truck.insuranceExpiry).slice(0, 10) : '',
@@ -153,9 +163,12 @@ export default function Trucks() {
     setEditError('');
     try {
       const res = await api.patch(`/api/vehicles/trucks/${selectedTruck.id}`, {
+        // type and category are always saved as the same value (same as the broker panel and
+        // RegisterTruck) — they used to be two independent fields here, so changing the category
+        // left `type` stale and the fleet table kept showing the old one.
         category: editForm.category || undefined,
+        type: editForm.category || undefined,
         capacity: editForm.capacity.trim() || undefined,
-        type: editForm.type.trim() || undefined,
         make: editForm.make.trim() || undefined,
         year: editForm.year ? Number(editForm.year) : undefined,
         insurance_expiry: editForm.insuranceExpiry || undefined,
@@ -450,10 +463,12 @@ export default function Trucks() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="form-label">Category</label>
-                <select value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))} className="form-select">
-                  {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-                </select>
+                <label className="form-label">Truck Type</label>
+                <SelectDropdown
+                  options={typeOptionsFor(editForm.category)}
+                  value={editForm.category}
+                  onChange={(v) => setEditForm((f) => ({ ...f, category: v }))}
+                />
               </div>
               <div>
                 <label className="form-label">Capacity</label>
@@ -461,15 +476,9 @@ export default function Trucks() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="form-label">Type</label>
-                <input value={editForm.type} onChange={(e) => setEditForm((f) => ({ ...f, type: e.target.value }))} className="form-input" placeholder="e.g. Large Truck" />
-              </div>
-              <div>
-                <label className="form-label">Make</label>
-                <input value={editForm.make} onChange={(e) => setEditForm((f) => ({ ...f, make: e.target.value }))} className="form-input" placeholder="e.g. Tata Ace" />
-              </div>
+            <div>
+              <label className="form-label">Make / Model</label>
+              <input value={editForm.make} onChange={(e) => setEditForm((f) => ({ ...f, make: e.target.value }))} className="form-input" placeholder="e.g. Tata Ace" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -485,9 +494,11 @@ export default function Trucks() {
 
             <div>
               <label className="form-label">Status</label>
-              <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="form-select">
-                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-              </select>
+              <SelectDropdown
+                options={STATUS_DROPDOWN_OPTIONS}
+                value={editForm.status}
+                onChange={(v) => setEditForm((f) => ({ ...f, status: v }))}
+              />
             </div>
 
             {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}

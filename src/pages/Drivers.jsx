@@ -4,6 +4,7 @@ import { Search, ChevronLeft, ChevronRight, Phone, Mail, Truck, Plus, MoreVertic
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
+import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 
 const STATUS_LABEL = { available: 'Available', on_trip: 'On Route', offline: 'Off Duty' };
@@ -452,9 +453,11 @@ export default function Drivers() {
             </div>
             <div>
               <label className="form-label">Status</label>
-              <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="form-select">
-                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-              </select>
+              <SelectDropdown
+                options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+                value={editForm.status}
+                onChange={(v) => setEditForm((f) => ({ ...f, status: v }))}
+              />
             </div>
             {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
             <div className="flex justify-end gap-2">
