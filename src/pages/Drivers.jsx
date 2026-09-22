@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, Phone, Mail, Truck, Plus, MoreVertical, LayoutGrid, List, Pencil, Trash2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Mail, Truck, Plus, MoreVertical, LayoutGrid, List, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
@@ -83,6 +83,9 @@ export default function Drivers() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resettingSession, setResettingSession] = useState(false);
+
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -160,6 +163,27 @@ export default function Drivers() {
       setToast({ message: err.message || 'Network error — could not delete driver', type: 'error' });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Ends every active session for a driver whose app was killed/lost connectivity without
+  // logging out — auth.controller.js's hasBlockingDriverSession only allows one active session
+  // per driver, so that driver is otherwise stuck unable to log in on a new device/reinstall for
+  // up to the refresh token's 30-day expiry. Reuses the existing generic admin endpoint (works
+  // for any user, not just drivers) rather than the new broker-scoped
+  // /api/vehicles/drivers/:id/force-logout, since admin already has one that works here.
+  const handleResetSession = async () => {
+    if (!resetTarget) return;
+    setResettingSession(true);
+    try {
+      const res = await api.post(`/api/admin/users/${resetTarget.id}/force-logout`, {}, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to reset session');
+      setResetTarget(null);
+      setToast({ message: `${resetTarget.name}'s session has been reset — they can log in again now.`, type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Network error — could not reset session', type: 'error' });
+    } finally {
+      setResettingSession(false);
     }
   };
 
@@ -417,6 +441,12 @@ export default function Drivers() {
                   <Trash2 size={13} /> Delete
                 </button>
               </div>
+              <button
+                onClick={() => setResetTarget(selectedDriver)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors text-sm font-semibold"
+              >
+                <RotateCcw size={13} /> Reset Session
+              </button>
             </div>
           )}
         </div>
@@ -478,6 +508,24 @@ export default function Drivers() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancel</button>
               <button onClick={handleDelete} disabled={deleting} className="btn-danger disabled:opacity-50">{deleting ? 'Deleting...' : 'Delete Driver'}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!resetTarget} onClose={() => setResetTarget(null)} title="Reset Driver Session" size="sm">
+        {resetTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              End every active session for <span className="font-semibold text-neutral-800">{resetTarget.name}</span>?
+              Use this if their app was force-closed or lost connectivity without logging out — that leaves them unable to
+              log in on a new device or after reinstalling until this is reset.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setResetTarget(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleResetSession} disabled={resettingSession} className="btn-primary disabled:opacity-50">
+                {resettingSession ? 'Resetting...' : 'Reset Session'}
+              </button>
             </div>
           </div>
         )}
