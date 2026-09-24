@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search, Eye, Ban, UserCheck, Trash2, CheckCircle2, XCircle,
-  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, X, Filter, Pencil,
+  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, X, Filter, Pencil, UserPlus,
 } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
@@ -46,7 +46,9 @@ const fmtTime = (iso) => {
   });
 };
 
-const ROLES = ['', 'client', 'broker', 'driver'];
+const ROLES = ['', 'client', 'broker', 'driver', 'admin', 'staff'];
+const ADD_USER_ROLES = ['staff', 'admin'];
+const EMPTY_ADD_FORM = { name: '', phone: '', email: '', password: '', role: 'staff' };
 const STATUSES = ['', 'active', 'inactive', 'blocked'];
 const KYC_STATUSES = ['', 'pending', 'submitted', 'verified', 'rejected'];
 
@@ -75,6 +77,11 @@ export default function Users() {
   const [editForm, setEditForm] = useState({ name: '', email: '', address: '', companyName: '' });
   const [editError, setEditError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_ADD_FORM);
+  const [addError, setAddError] = useState('');
+  const [addingUser, setAddingUser] = useState(false);
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -198,6 +205,39 @@ export default function Users() {
     }
   };
 
+  const openAddUser = () => {
+    setAddForm(EMPTY_ADD_FORM);
+    setAddError('');
+    setShowAddUser(true);
+  };
+
+  const handleAddUser = async () => {
+    if (!addForm.name.trim()) return setAddError('Name is required.');
+    if (!/^\d{10}$/.test(addForm.phone.trim())) return setAddError('Phone number must be 10 digits.');
+    if (!addForm.email.trim()) return setAddError('Email is required.');
+    if (addForm.password.length < 8) return setAddError('Password must be at least 8 characters.');
+
+    setAddingUser(true);
+    setAddError('');
+    try {
+      const data = await api.post('/api/auth/admin/register', {
+        name: addForm.name.trim(),
+        phone: addForm.phone.trim(),
+        email: addForm.email.trim(),
+        password: addForm.password,
+        role: addForm.role,
+      }, getToken());
+      if (!data.success) throw new Error(data.message || 'Failed to create user');
+      setShowAddUser(false);
+      showToast(`${cap(addForm.role)} account created successfully`);
+      fetchUsers(page, search, roleFilter, statusFilter, kycFilter);
+    } catch (err) {
+      setAddError(err.message || 'Network error — could not create user');
+    } finally {
+      setAddingUser(false);
+    }
+  };
+
   const handleViewUser = async (user) => {
     setSelectedUser(user);
     setKycDetail(null);
@@ -274,14 +314,20 @@ export default function Users() {
       <div className="card overflow-hidden">
         <div className="px-5 pt-4 pb-2 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-base font-poppins font-semibold text-secondary">Users</h3>
-          <button
-            onClick={() => fetchUsers(page, search, roleFilter, statusFilter, kycFilter)}
-            disabled={loading}
-            className="btn-secondary !py-2 !px-3 text-sm disabled:opacity-40"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={openAddUser} className="btn-primary !py-2 !px-3 text-sm">
+              <UserPlus size={14} />
+              Add User
+            </button>
+            <button
+              onClick={() => fetchUsers(page, search, roleFilter, statusFilter, kycFilter)}
+              disabled={loading}
+              className="btn-secondary !py-2 !px-3 text-sm disabled:opacity-40"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="px-5 pt-4 pb-4 flex flex-wrap items-center justify-between gap-3">
@@ -641,6 +687,69 @@ export default function Users() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Add User Modal — only admin/staff accounts (created directly, no OTP flow); clients,
+          brokers and drivers still go through the normal app registration/KYC flow. */}
+      <Modal isOpen={showAddUser} onClose={() => setShowAddUser(false)} title="Add User" size="sm">
+        <div className="space-y-4">
+          <div>
+            <label className="form-label">Role</label>
+            <div className="flex gap-2">
+              {ADD_USER_ROLES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setAddForm((f) => ({ ...f, role: r }))}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    addForm.role === r
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                  }`}
+                >
+                  {cap(r)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="form-label">Name</label>
+            <input value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))} className="form-input" />
+          </div>
+          <div>
+            <label className="form-label">Phone</label>
+            <input
+              value={addForm.phone}
+              onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+              placeholder="10-digit phone number"
+              className="form-input"
+            />
+          </div>
+          <div>
+            <label className="form-label">Email</label>
+            <input type="email" value={addForm.email} onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))} className="form-input" />
+          </div>
+          <div>
+            <label className="form-label">Password</label>
+            <input
+              type="password"
+              value={addForm.password}
+              onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
+              placeholder="At least 8 characters"
+              className="form-input"
+            />
+          </div>
+          <p className="text-xs text-neutral-400">
+            This account is created active and verified immediately — no OTP step, same as the existing Admin login.
+          </p>
+          {addError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{addError}</div>}
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAddUser(false)} className="btn-secondary">Cancel</button>
+            <button onClick={handleAddUser} disabled={addingUser} className="btn-primary disabled:opacity-50">
+              {addingUser ? 'Creating...' : `Create ${cap(addForm.role)}`}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Delete Confirm Modal */}
