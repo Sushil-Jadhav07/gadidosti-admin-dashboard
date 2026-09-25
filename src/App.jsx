@@ -24,6 +24,7 @@ import Tracking from './pages/Tracking';
 import TrackingDetail from './pages/TrackingDetail';
 import Invoices from './pages/Invoices';
 import Chats from './pages/Chats';
+import MonthlyHiring from './pages/MonthlyHiring';
 import Login from './pages/Login';
 import { api } from './services/api';
 import { requestFcmToken, onForegroundMessage } from './lib/firebase';
@@ -199,6 +200,7 @@ export default function App() {
             <Route path="/tracking/:imei"  element={<TrackingDetail />} />
             <Route path="/invoices"  element={<Invoices />} />
             <Route path="/chats"     element={<Chats />} />
+            <Route path="/monthly-hiring" element={<MonthlyHiring />} />
             <Route path="/pricing"   element={<Pricing />} />
             <Route path="/disputes"  element={<Disputes />} />
             <Route path="/incidents" element={<Incidents />} />

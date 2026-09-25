@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
-  Settings, Radar, Receipt, MessageCircle,
+  Settings, Radar, Receipt, MessageCircle, CalendarClock,
 } from 'lucide-react';
 
 const sections = [
@@ -18,6 +18,7 @@ const sections = [
       { path: '/trucks', label: 'Trucks', icon: Truck },
       { path: '/tracking', label: 'Live Tracking', icon: Radar },
       { path: '/chats', label: 'Chats', subLabel: 'Trip conversations', icon: MessageCircle },
+      { path: '/monthly-hiring', label: 'Monthly Hiring', subLabel: 'Enquiries & listings', icon: CalendarClock },
     ],
   },
   {
