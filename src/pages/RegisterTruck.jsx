@@ -6,16 +6,20 @@ import Toast from '../components/Toast';
 import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 import { TRUCK_IMAGES } from '../lib/truckImages';
+import { TRUCK_TYPES, truckTypeLabel } from '../lib/truckTypes';
 
-const TRUCK_CATEGORIES = ['small', 'medium', 'large', 'part'];
 const REGISTRATION_REGEX = /^[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{1,4}$/i;
-const EMPTY_FORM = { brokerId: '', registration: '', category: 'small', capacity: '', make: '', year: '', insuranceExpiry: '' };
+const EMPTY_FORM = { brokerId: '', registration: '', category: '14ft', capacity: TRUCK_TYPES.find((t) => t.value === '14ft')?.capacity || '', make: '', year: '', insuranceExpiry: '' };
 
 const CATEGORY_COPY = {
-  small: 'City and light-load movement',
-  medium: 'Balanced fleet workhorse',
-  large: 'High-volume long-haul capacity',
-  part: 'Part-load and shared dispatch',
+  '3_wheeler': 'Tight lanes, light local drops',
+  tata_ace: 'City and light-load movement',
+  pickup_8ft: 'Small commercial loads',
+  pickup_10ft: 'Slightly larger local/regional loads',
+  '14ft': 'Balanced fleet workhorse',
+  '17ft': 'Heavier regional dispatch',
+  '19ft': 'High-volume long-haul capacity',
+  '22ft': 'Maximum capacity, long-haul',
 };
 
 export default function RegisterTruck() {
@@ -106,9 +110,13 @@ export default function RegisterTruck() {
               <div>
                 <label className="form-label">Truck Type *</label>
                 <SelectDropdown
-                  options={TRUCK_CATEGORIES.map((cat) => ({ value: cat, label: cat[0].toUpperCase() + cat.slice(1) }))}
+                  options={TRUCK_TYPES.map((t) => ({ value: t.value, label: `${t.label} — ${t.capacity}` }))}
                   value={form.category}
-                  onChange={(v) => setField('category', v)}
+                  onChange={(v) => {
+                    setField('category', v);
+                    const matched = TRUCK_TYPES.find((t) => t.value === v);
+                    if (matched) setField('capacity', matched.capacity);
+                  }}
                 />
               </div>
               <div>
@@ -174,7 +182,7 @@ export default function RegisterTruck() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-poppins text-lg font-semibold text-secondary">{form.registration || 'MH-12-AB-1234'}</p>
-                    <p className="mt-1 text-sm text-neutral-400">{form.make || 'Make / model'} · {form.category}</p>
+                    <p className="mt-1 text-sm text-neutral-400">{form.make || 'Make / model'} · {truckTypeLabel(form.category)}</p>
                   </div>
                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Available</span>
                 </div>

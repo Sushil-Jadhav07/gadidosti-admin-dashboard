@@ -13,6 +13,7 @@ import InvoiceDocument, { invoiceNumberFor } from '../components/InvoiceDocument
 import { downloadElementAsPdf } from '../lib/pdfExport';
 import { getInvoiceRegistry, hasGeneratedInvoice, markInvoiceGenerated } from '../lib/invoiceRegistry';
 import { api, getToken } from '../services/api';
+import { TRUCK_TYPES } from '../lib/truckTypes';
 
 export const STATUS_MAP = {
   pending: 'Requested',
@@ -40,9 +41,13 @@ const STATUS_TO_QUERY = {
 
 const statusTabs = ['All', 'Requested', 'Accepted', 'Assigned', 'En Route Pickup', 'Picked Up', 'In Transit', 'Delivered', 'Completed', 'Cancelled'];
 
-const TRUCK_TYPE_OPTIONS = ['All Types', 'Small', 'Medium', 'Large'];
+const TRUCK_TYPE_OPTIONS = [{ value: '', label: 'All Types' }, ...TRUCK_TYPES.map((t) => ({ value: t.value, label: t.label })), { value: 'part', label: 'Part Truck' }];
 
-export const CATEGORY_COLOR = { small: '#166534', medium: '#17D86B', large: '#F59E0B' };
+export const CATEGORY_COLOR = {
+  small: '#166534', medium: '#17D86B', large: '#F59E0B', part: '#64748B',
+  '3_wheeler': '#0EA5E9', tata_ace: '#166534', pickup_8ft: '#17D86B', pickup_10ft: '#0D9488',
+  '14ft': '#F59E0B', '17ft': '#F97316', '19ft': '#DC2626', '22ft': '#7C3AED',
+};
 
 // Real booking statuses grouped into the 4 buckets the Order Overview card summarizes —
 // "cancelled" is deliberately excluded, same as it's excluded from the reference's overview.
@@ -233,7 +238,7 @@ export default function Bookings() {
   const navigate = useNavigate();
   const location = useLocation();
   const [statusTab, setStatusTab] = useState('All');
-  const [truckTypeFilter, setTruckTypeFilter] = useState('All Types');
+  const [truckTypeFilter, setTruckTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -333,9 +338,7 @@ export default function Bookings() {
 
   const filteredBookings = useMemo(() => bookings.filter((booking) => {
     const matchStatus = statusTab === 'All' || booking.status === STATUS_TO_QUERY[statusTab];
-    const matchTruckType = truckTypeFilter === 'All Types' ||
-      (booking.truckCategory || '').toLowerCase() === truckTypeFilter.toLowerCase() ||
-      (booking.truckType || '').toLowerCase().includes(truckTypeFilter.toLowerCase());
+    const matchTruckType = !truckTypeFilter || (booking.truckCategory || '').toLowerCase() === truckTypeFilter.toLowerCase();
     const term = searchTerm.trim().toLowerCase();
     const matchSearch = !term ||
       String(booking.id || '').toLowerCase().includes(term) ||
@@ -584,15 +587,15 @@ export default function Bookings() {
             <div className="relative" ref={filtersRef}>
               <button
                 onClick={() => setFiltersOpen((v) => !v)}
-                className={`!py-2 !px-3 text-sm ${truckTypeFilter === 'All Types' ? 'btn-secondary' : 'bg-primary/10 text-primary border border-primary/20 inline-flex items-center gap-2 rounded-xl font-semibold transition-colors hover:bg-primary/15'}`}
+                className={`!py-2 !px-3 text-sm ${!truckTypeFilter ? 'btn-secondary' : 'bg-primary/10 text-primary border border-primary/20 inline-flex items-center gap-2 rounded-xl font-semibold transition-colors hover:bg-primary/15'}`}
               >
-                <Filter size={14} /> {truckTypeFilter === 'All Types' ? 'Filter' : truckTypeFilter}
+                <Filter size={14} /> {!truckTypeFilter ? 'Filter' : (TRUCK_TYPE_OPTIONS.find((t) => t.value === truckTypeFilter)?.label || truckTypeFilter)}
               </button>
               {filtersOpen && (
                 <div className="absolute right-0 top-10 w-48 bg-white border border-neutral-100 rounded-xl shadow-dropdown z-20 p-3">
                   <label className="form-label">Truck Type</label>
                   <select value={truckTypeFilter} onChange={(e) => setTruckTypeFilter(e.target.value)} className="form-select w-full">
-                    {TRUCK_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {TRUCK_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
               )}

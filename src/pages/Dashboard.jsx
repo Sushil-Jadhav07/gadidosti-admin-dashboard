@@ -12,9 +12,10 @@ import StatCard from "../components/StatCard";
 import Badge from "../components/Badge";
 import { api, getToken } from "../services/api";
 import { STATUS_MAP, bookingRef } from "./Bookings";
+import { TRUCK_TYPES } from "../lib/truckTypes";
 
 const PIE_COLORS = ["#166534", "#0D9488", "#F59E0B", "#64748B", "#94A3B8"];
-const TRUCK_TYPE_OPTIONS = ["All Types", "Small", "Medium", "Large"];
+const TRUCK_TYPE_OPTIONS = [{ value: "", label: "All Types" }, ...TRUCK_TYPES.map((t) => ({ value: t.value, label: t.label })), { value: "part", label: "Part Truck" }];
 const TABLE_PAGE_SIZE = 8;
 
 // Every non-terminal trip status — same set Bookings.jsx's status tabs cover between
@@ -66,7 +67,7 @@ export default function Dashboard() {
   const [trackIndex, setTrackIndex] = useState(0);
   const [hiddenSeries, setHiddenSeries] = useState({});
   const [tableSearch, setTableSearch] = useState("");
-  const [tableTruckFilter, setTableTruckFilter] = useState("All Types");
+  const [tableTruckFilter, setTableTruckFilter] = useState("");
   const [tablePage, setTablePage] = useState(1);
   const navigate = useNavigate();
 
@@ -146,9 +147,7 @@ export default function Dashboard() {
   const totalLocationBookings = useMemo(() => locationDistribution.reduce((sum, i) => sum + i.value, 0), [locationDistribution]);
 
   const filteredBookings = useMemo(() => bookings.filter((b) => {
-    const matchTruck = tableTruckFilter === "All Types" ||
-      (b.truckCategory || "").toLowerCase() === tableTruckFilter.toLowerCase() ||
-      (b.truckType || "").toLowerCase().includes(tableTruckFilter.toLowerCase());
+    const matchTruck = !tableTruckFilter || (b.truckCategory || "").toLowerCase() === tableTruckFilter.toLowerCase();
     const term = tableSearch.trim().toLowerCase();
     const matchSearch = !term ||
       String(b.bookingNumber || b.id || "").toLowerCase().includes(term) ||
@@ -381,7 +380,7 @@ export default function Dashboard() {
               onChange={(e) => setTableTruckFilter(e.target.value)}
               className="appearance-none pl-9 pr-8 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-700 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer"
             >
-              {TRUCK_TYPE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+              {TRUCK_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
           </div>
         </div>

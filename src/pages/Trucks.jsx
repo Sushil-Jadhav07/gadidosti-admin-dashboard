@@ -8,6 +8,7 @@ import Toast from '../components/Toast';
 import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 import { TRUCK_IMAGES } from '../lib/truckImages';
+import { TRUCK_TYPES, truckTypeLabel } from '../lib/truckTypes';
 
 const STATUS_META = {
   available: { label: 'Available', color: '#17D86B' },
@@ -16,11 +17,12 @@ const STATUS_META = {
 };
 const STATUS_LABEL = Object.fromEntries(Object.entries(STATUS_META).map(([k, v]) => [k, v.label]));
 const STATUS_OPTIONS = Object.keys(STATUS_META);
-// Same three options as the broker panel's truck form. 'part' is still valid server-side
-// (vehicle.validation.js TRUCK_CATEGORIES) — a truck that already has it keeps it as an extra
-// option in the edit form (see typeOptionsFor) rather than being silently switched to another.
-const TYPE_OPTIONS = ['small', 'medium', 'large'];
-const typeLabel = (v) => (v ? v.charAt(0).toUpperCase() + v.slice(1) : '');
+// The 8 new specific truck types. A truck still carrying a pre-retaxonomy category (small/
+// medium/large — never force-migrated, see gadidosti-backend's db/51vehicle_pricing.sql) keeps
+// that as an extra option in its own edit form (see typeOptionsFor) rather than being silently
+// switched to something else.
+const TYPE_OPTIONS = TRUCK_TYPES.map((t) => t.value);
+const typeLabel = (v) => truckTypeLabel(v);
 const typeOptionsFor = (current) =>
   (current && !TYPE_OPTIONS.includes(current) ? [...TYPE_OPTIONS, current] : TYPE_OPTIONS)
     .map((v) => ({ value: v, label: typeLabel(v) }));
@@ -147,7 +149,7 @@ export default function Trucks() {
   const openTruck = (truck) => {
     setSelectedTruck(truck);
     setEditForm({
-      category: truck.category || 'small',
+      category: truck.category || '14ft',
       capacity: stripPlaceholder(truck.capacity),
       make: stripPlaceholder(truck.make),
       year: stripPlaceholder(truck.year),
@@ -326,7 +328,7 @@ export default function Trucks() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h3 className="font-poppins font-semibold text-secondary truncate">{truck.regNo}</h3>
-                      <p className="text-xs text-neutral-400 mt-0.5 truncate">{truck.make} · {truck.type}</p>
+                      <p className="text-xs text-neutral-400 mt-0.5 truncate">{truck.make} · {truckTypeLabel(truck.category)}</p>
                     </div>
                     <Badge status={truck.statusLabel} />
                   </div>
@@ -402,7 +404,7 @@ export default function Trucks() {
                                 <Truck size={13} className="text-neutral-300" />
                               )}
                             </div>
-                            {truck.type}
+                            {truckTypeLabel(truck.category)}
                           </div>
                         </td>
                         <td className="whitespace-nowrap">{truck.make} <span className="text-neutral-400">· {truck.year}</span></td>

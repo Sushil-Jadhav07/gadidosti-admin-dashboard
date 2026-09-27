@@ -1,18 +1,76 @@
 import { useEffect, useState } from "react";
-import { Truck, Save, IndianRupee, Package, TrendingUp, Percent, Clock, Wallet, Zap, Timer } from "lucide-react";
+import { Truck, Save, IndianRupee, Package, TrendingUp, Percent, Clock, Wallet, Zap, Timer, MapPinned, Route } from "lucide-react";
 import Toast from "../components/Toast";
 import { api, getToken } from "../services/api";
+import { TRUCK_TYPES } from "../lib/truckTypes";
 
-const CATEGORY_META = {
-  small: { label: "Small Truck", color: "#166534", tint: "bg-[#166534]/10" },
-  medium: { label: "Medium Truck", color: "#17D86B", tint: "bg-[#17D86B]/10" },
-  large: { label: "Large Truck", color: "#F59E0B", tint: "bg-[#F59E0B]/10" },
+// Distance bands the vehicle-pricing rate card is keyed by — same 8 bands as
+// gadidosti-backend's pricing.model.js DISTANCE_BANDS_KM, each a per-km rate that applies to the
+// WHOLE trip once its total length falls into that band (not a progressive/cumulative rate).
+const DISTANCE_BANDS = [
+  { maxKm: 25, label: "Up to 25 km" },
+  { maxKm: 50, label: "25–50 km" },
+  { maxKm: 100, label: "50–100 km" },
+  { maxKm: 300, label: "100–300 km" },
+  { maxKm: 1000, label: "300–1000 km" },
+  { maxKm: 1500, label: "1000–1500 km" },
+  { maxKm: 2000, label: "1500–2000 km" },
+  { maxKm: null, label: "2000 km+" },
+];
+
+const VEHICLE_COLORS = {
+  "3_wheeler": "#0EA5E9", tata_ace: "#166534", pickup_8ft: "#17D86B", pickup_10ft: "#0D9488",
+  "14ft": "#F59E0B", "17ft": "#F97316", "19ft": "#DC2626", "22ft": "#7C3AED",
 };
 
-const DEFAULT_CATEGORY = { baseFare: 0, perKmRate: 0, platformFee: 0, waitingCharge: 0, demandMultiplier: 1 };
+// Mirrors gadidosti-backend's pricing.model.js DEFAULT_VEHICLE_PRICING exactly — the client-side
+// defaults shown until an admin has ever saved this section.
+const DEFAULT_VEHICLE_PRICING = {
+  "3_wheeler":   { minimumFare: 400,  ratesByBand: [35, 27, 32, 17, 12, 12, 12, 12] },
+  tata_ace:      { minimumFare: 800,  ratesByBand: [55, 32, 37, 20, 13, 13, 13, 13] },
+  pickup_8ft:    { minimumFare: 900,  ratesByBand: [65, 37, 47, 26, 15, 15, 15, 15] },
+  pickup_10ft:   { minimumFare: 1000, ratesByBand: [80, 53, 70, 30, 16, 16, 16, 16] },
+  "14ft":        { minimumFare: 1700, ratesByBand: [110, 68, 88, 33, 20, 20, 20, 20] },
+  "17ft":        { minimumFare: 2700, ratesByBand: [160, 100, 128, 36, 21, 21, 21, 21] },
+  "19ft":        { minimumFare: 3800, ratesByBand: [210, 122, 146, 40, 23, 23, 23, 23] },
+  "22ft":        { minimumFare: 4400, ratesByBand: [250, 142, 161, 43, 25, 25, 25, 25] },
+};
+
+// Mirrors gadidosti-backend's pricing.model.js DEFAULT_REGION_RATES / DEFAULT_REGION_ZONES.
+const DEFAULT_REGION_RATES = {
+  southEast:    { "3_wheeler": 17, tata_ace: 18, pickup_8ft: 20, pickup_10ft: 22, "14ft": 25, "17ft": 26, "19ft": 28, "22ft": 30 },
+  guwahatiSide: { "3_wheeler": 20, tata_ace: 21, pickup_8ft: 23, pickup_10ft: 24, "14ft": 27, "17ft": 29, "19ft": 31, "22ft": 33 },
+  kerala:       { "3_wheeler": 22, tata_ace: 25, pickup_8ft: 26, pickup_10ft: 26, "14ft": 29, "17ft": 31, "19ft": 33, "22ft": 35 },
+};
+const DEFAULT_REGION_ZONES = {
+  southEast: ["Tamil Nadu", "Andhra Pradesh", "Telangana", "Karnataka", "Puducherry"],
+  guwahatiSide: ["Assam", "Meghalaya", "Manipur", "Mizoram", "Nagaland", "Tripura", "Arunachal Pradesh", "Sikkim"],
+  kerala: ["Kerala"],
+};
+const REGION_META = {
+  southEast: { label: "South-East", color: "#F59E0B" },
+  guwahatiSide: { label: "Guwahati Side", color: "#0EA5E9" },
+  kerala: { label: "Kerala", color: "#17D86B" },
+};
+
+// The old broad small/medium/large buckets still exist for one narrower purpose: the per-hour
+// waiting/halting-overage rate and platform fee — every one of the 8 new specific truck types
+// resolves down to whichever of these 3 it's closest in size to (see gadidosti-backend's
+// pricing.model.js VEHICLE_TYPE_TO_LEGACY_BUCKET). The old baseFare/perKmRate/demandMultiplier
+// fields that used to live here are gone — the new Vehicle Pricing rate card below is the real
+// fare now.
+const BUCKET_META = {
+  small: { label: "Small-size trucks", hint: "3 Wheeler, Tata Ace, Pickup 8ft", color: "#166534" },
+  medium: { label: "Medium-size trucks", hint: "Pickup 10ft, 14ft", color: "#17D86B" },
+  large: { label: "Large-size trucks", hint: "17ft, 19ft, 22ft", color: "#F59E0B" },
+};
+const DEFAULT_BUCKET = { platformFee: 0, waitingCharge: 0 };
 
 const DEFAULT_CONFIG = {
-  intraCity: { small: { ...DEFAULT_CATEGORY }, medium: { ...DEFAULT_CATEGORY }, large: { ...DEFAULT_CATEGORY } },
+  vehiclePricing: DEFAULT_VEHICLE_PRICING,
+  regionRates: DEFAULT_REGION_RATES,
+  regionZones: DEFAULT_REGION_ZONES,
+  intraCity: { small: { ...DEFAULT_BUCKET }, medium: { ...DEFAULT_BUCKET }, large: { ...DEFAULT_BUCKET } },
   interCity: { baseRatePerKm: 0, fuelSurcharge: 0, platformFee: 0, tollHandling: "actual", tollFixedAmount: 0 },
   partTruck: { platformFee: 0 },
   // Freight payment stages: "Advance" always offers *some* amount now (no longer gated behind
@@ -26,9 +84,8 @@ const DEFAULT_CONFIG = {
       { maxAmount: null, type: "percent", value: 0.8 },
     ],
   },
-  // Delivery SLA: distance-tiered expected total delivery time — distinct from
-  // intraCity.<category>.waitingCharge's per-hour rate (reused as-is for the overage amount, no
-  // new rate field) and from the separate inter-city halting grace period above. Mirrors
+  // Delivery SLA: distance-tiered expected total delivery time — distinct from the halting
+  // waiting-charge rate above and from the separate inter-city halting grace period. Mirrors
   // gadidosti-backend's pricing.model.js DEFAULT_SLA_TIERS exactly.
   deliverySla: {
     tiers: [
@@ -64,7 +121,7 @@ function Spinner({ className = "w-4 h-4 border-2 border-white/30 border-t-white"
 function NumberField({ label, value, onChange, prefix, suffix, min = 0 }) {
   return (
     <div>
-      <label className="form-label">{label}</label>
+      {label && <label className="form-label">{label}</label>}
       <div className="relative">
         {prefix && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-sm font-medium">{prefix}</span>}
         <input
@@ -80,67 +137,123 @@ function NumberField({ label, value, onChange, prefix, suffix, min = 0 }) {
   );
 }
 
-function DemandSlider({ value, onChange, color }) {
-  const pct = Math.max(0, Math.min(100, ((value - 1) / (3 - 1)) * 100));
+// One card per truck type — minimum fare (the floor, never charged less than this) plus the
+// 8-band distance-tiered per-km rate table. This is the actual fare-driving config now.
+function VehiclePricingCard({ type, data, onChange }) {
+  const meta = TRUCK_TYPES.find((t) => t.value === type);
+  const color = VEHICLE_COLORS[type] || "#166534";
+  const setMinimum = (v) => onChange(type, { ...data, minimumFare: v });
+  const setRate = (i) => (v) => {
+    const ratesByBand = [...data.ratesByBand];
+    ratesByBand[i] = v;
+    onChange(type, { ...data, ratesByBand });
+  };
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="form-label !mb-0">Demand Multiplier</label>
-        <span
-          className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-          style={{ backgroundColor: color }}
-        >
-          {Number(value).toFixed(1)}x
-        </span>
-      </div>
-      <div className="relative pt-1 pb-1">
-        <div className="h-2 rounded-full bg-neutral-100 relative overflow-hidden">
-          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+    <div className="card overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4" style={{ backgroundColor: `${color}14` }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color }}>
+          <Truck size={18} className="text-white" />
         </div>
-        <input
-          type="range"
-          min={1}
-          max={3}
-          step={0.1}
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="absolute inset-0 w-full h-4 top-0 opacity-0 cursor-pointer"
-        />
-        <div
-          className="absolute top-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md -translate-y-1/2 pointer-events-none"
-          style={{ left: `calc(${pct}% - 8px)`, backgroundColor: color }}
-        />
+        <div>
+          <h4 className="font-poppins font-semibold text-secondary text-sm">{meta?.label || type}</h4>
+          <p className="text-[11px] text-neutral-400">{meta?.capacity}</p>
+        </div>
       </div>
-      <div className="flex justify-between text-[10px] text-neutral-400 mt-1">
-        <span>1.0x (off-peak)</span>
-        <span>3.0x (peak surge)</span>
+      <div className="p-5 space-y-4">
+        <NumberField label="Minimum Fare" prefix="₹" value={data.minimumFare} onChange={setMinimum} />
+        <div>
+          <p className="form-label !mb-2">Rate per KM, by trip distance</p>
+          <div className="space-y-2">
+            {DISTANCE_BANDS.map((band, i) => (
+              <div key={band.label} className="flex items-center gap-3">
+                <span className="text-xs text-neutral-500 w-28 flex-shrink-0">{band.label}</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-xs font-medium">₹</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={data.ratesByBand[i]}
+                    onChange={(e) => setRate(i)(parseFloat(e.target.value) || 0)}
+                    className="form-input !py-1.5 pl-6 text-sm"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function IntraCityCard({ category, data, onChange }) {
-  const meta = CATEGORY_META[category];
-  const set = (field) => (val) => onChange(category, { ...data, [field]: val });
+// One card per named region — a flat per-km rate per truck type (overrides the distance-band
+// lookup above entirely for a booking dropping in one of the listed states) plus the editable
+// list of states that count as this zone.
+function RegionPricingCard({ zoneKey, rates, states, onRateChange, onStatesChange }) {
+  const meta = REGION_META[zoneKey];
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4" style={{ backgroundColor: `${meta.color}14` }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: meta.color }}>
+          <MapPinned size={18} className="text-white" />
+        </div>
+        <h4 className="font-poppins font-semibold text-secondary text-sm">{meta.label}</h4>
+      </div>
+      <div className="p-5 space-y-4">
+        <div>
+          <label className="form-label">States in this zone</label>
+          <input
+            type="text"
+            value={states.join(", ")}
+            onChange={(e) => onStatesChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
+            className="form-input text-sm"
+            placeholder="e.g. Tamil Nadu, Karnataka"
+          />
+          <p className="text-[11px] text-neutral-400 mt-1">Comma-separated. Matched against the drop-off address's state.</p>
+        </div>
+        <div>
+          <p className="form-label !mb-2">Rate per KM, by truck type</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            {TRUCK_TYPES.map((t) => (
+              <div key={t.value} className="flex items-center gap-2">
+                <span className="text-xs text-neutral-500 flex-1 truncate">{t.label}</span>
+                <div className="relative w-20 flex-shrink-0">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 text-xs font-medium">₹</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={rates[t.value] ?? 0}
+                    onChange={(e) => onRateChange(t.value, parseFloat(e.target.value) || 0)}
+                    className="form-input !py-1.5 pl-5 text-sm"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
+function BucketCard({ bucket, data, onChange }) {
+  const meta = BUCKET_META[bucket];
+  const set = (field) => (val) => onChange(bucket, { ...data, [field]: val });
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-4" style={{ backgroundColor: `${meta.color}14` }}>
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: meta.color }}>
           <Truck size={18} className="text-white" />
         </div>
-        <h4 className="font-poppins font-semibold text-secondary text-sm">{meta.label}</h4>
+        <div>
+          <h4 className="font-poppins font-semibold text-secondary text-sm">{meta.label}</h4>
+          <p className="text-[11px] text-neutral-400">{meta.hint}</p>
+        </div>
       </div>
-      <div className="p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <NumberField label="Base Fare" prefix="₹" value={data.baseFare} onChange={set("baseFare")} />
-          <NumberField label="Per KM Rate" prefix="₹" value={data.perKmRate} onChange={set("perKmRate")} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <NumberField label="Platform Fee" suffix="%" value={data.platformFee} onChange={set("platformFee")} />
-          <NumberField label="Waiting/hr" prefix="₹" value={data.waitingCharge} onChange={set("waitingCharge")} />
-        </div>
-        <DemandSlider value={data.demandMultiplier} onChange={set("demandMultiplier")} color={meta.color} />
+      <div className="p-5 grid grid-cols-2 gap-3">
+        <NumberField label="Platform Fee" suffix="%" value={data.platformFee} onChange={set("platformFee")} />
+        <NumberField label="Waiting/hr" prefix="₹" value={data.waitingCharge} onChange={set("waitingCharge")} />
       </div>
     </div>
   );
@@ -180,10 +293,31 @@ export default function Pricing() {
       if (res.success) {
         const remote = res.data?.config || res.data || {};
         setConfig({
+          vehiclePricing: Object.fromEntries(
+            TRUCK_TYPES.map((t) => [
+              t.value,
+              {
+                minimumFare: remote.vehiclePricing?.[t.value]?.minimumFare ?? DEFAULT_VEHICLE_PRICING[t.value].minimumFare,
+                ratesByBand: remote.vehiclePricing?.[t.value]?.ratesByBand?.length === 8
+                  ? remote.vehiclePricing[t.value].ratesByBand
+                  : DEFAULT_VEHICLE_PRICING[t.value].ratesByBand,
+              },
+            ])
+          ),
+          regionRates: {
+            southEast: { ...DEFAULT_REGION_RATES.southEast, ...(remote.regionRates?.southEast || {}) },
+            guwahatiSide: { ...DEFAULT_REGION_RATES.guwahatiSide, ...(remote.regionRates?.guwahatiSide || {}) },
+            kerala: { ...DEFAULT_REGION_RATES.kerala, ...(remote.regionRates?.kerala || {}) },
+          },
+          regionZones: {
+            southEast: remote.regionZones?.southEast?.length ? remote.regionZones.southEast : DEFAULT_REGION_ZONES.southEast,
+            guwahatiSide: remote.regionZones?.guwahatiSide?.length ? remote.regionZones.guwahatiSide : DEFAULT_REGION_ZONES.guwahatiSide,
+            kerala: remote.regionZones?.kerala?.length ? remote.regionZones.kerala : DEFAULT_REGION_ZONES.kerala,
+          },
           intraCity: {
-            small: { ...DEFAULT_CATEGORY, ...(remote.intraCity?.small || {}) },
-            medium: { ...DEFAULT_CATEGORY, ...(remote.intraCity?.medium || {}) },
-            large: { ...DEFAULT_CATEGORY, ...(remote.intraCity?.large || {}) },
+            small: { ...DEFAULT_BUCKET, ...(remote.intraCity?.small || {}) },
+            medium: { ...DEFAULT_BUCKET, ...(remote.intraCity?.medium || {}) },
+            large: { ...DEFAULT_BUCKET, ...(remote.intraCity?.large || {}) },
           },
           interCity: { ...DEFAULT_CONFIG.interCity, ...(remote.interCity || {}) },
           partTruck: { ...DEFAULT_CONFIG.partTruck, ...(remote.partTruck || {}) },
@@ -227,11 +361,23 @@ export default function Pricing() {
     }
   };
 
-  const updateIntraCity = (category, next) => {
+  const updateVehiclePricing = (type, next) => {
+    setConfig((current) => ({ ...current, vehiclePricing: { ...current.vehiclePricing, [type]: next } }));
+  };
+
+  const updateRegionRate = (zoneKey, truckType, value) => {
     setConfig((current) => ({
       ...current,
-      intraCity: { ...current.intraCity, [category]: next },
+      regionRates: { ...current.regionRates, [zoneKey]: { ...current.regionRates[zoneKey], [truckType]: value } },
     }));
+  };
+
+  const updateRegionZoneStates = (zoneKey, states) => {
+    setConfig((current) => ({ ...current, regionZones: { ...current.regionZones, [zoneKey]: states } }));
+  };
+
+  const updateBucket = (bucket, next) => {
+    setConfig((current) => ({ ...current, intraCity: { ...current.intraCity, [bucket]: next } }));
   };
 
   const updateInterCity = (field, value) => {
@@ -317,11 +463,46 @@ export default function Pricing() {
         <p className="text-sm text-neutral-500 mt-1">Configure pricing rules for different service types</p>
       </div>
 
-      {/* Intra-City */}
-      <SectionShell icon={IndianRupee} title="Intra-City Pricing" subtitle="Per truck-category fare rules for same-city bookings">
+      {/* Vehicle Pricing — the real fare-driving config now */}
+      <SectionShell icon={Route} title="Vehicle Pricing" subtitle="Minimum fare + distance-tiered per-km rate, per truck type. Applies to every booking regardless of intra/inter-city.">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+          {TRUCK_TYPES.map((t) => (
+            <VehiclePricingCard key={t.value} type={t.value} data={config.vehiclePricing[t.value]} onChange={updateVehiclePricing} />
+          ))}
+        </div>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("vehiclePricing")} disabled={savingSection === "vehiclePricing"} className="btn-primary">
+            {savingSection === "vehiclePricing" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Regional Pricing */}
+      <SectionShell icon={MapPinned} title="Regional Pricing" subtitle="Flat per-km rates for named zones — overrides the distance-tier lookup above whenever the drop-off state matches one of these zones.">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {["small", "medium", "large"].map((cat) => (
-            <IntraCityCard key={cat} category={cat} data={config.intraCity[cat]} onChange={updateIntraCity} />
+          {Object.keys(REGION_META).map((zoneKey) => (
+            <RegionPricingCard
+              key={zoneKey}
+              zoneKey={zoneKey}
+              rates={config.regionRates[zoneKey]}
+              states={config.regionZones[zoneKey]}
+              onRateChange={(truckType, value) => updateRegionRate(zoneKey, truckType, value)}
+              onStatesChange={(states) => updateRegionZoneStates(zoneKey, states)}
+            />
+          ))}
+        </div>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("regionPricing")} disabled={savingSection === "regionPricing"} className="btn-primary">
+            {savingSection === "regionPricing" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Waiting Charge & Platform Fee (legacy size buckets — still drive halting rate + fee) */}
+      <SectionShell icon={IndianRupee} title="Waiting Charge & Platform Fee" subtitle="By size bucket — every truck type above resolves to whichever of these 3 it's closest in size to.">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {["small", "medium", "large"].map((bucket) => (
+            <BucketCard key={bucket} bucket={bucket} data={config.intraCity[bucket]} onChange={updateBucket} />
           ))}
         </div>
         <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
@@ -331,15 +512,14 @@ export default function Pricing() {
         </div>
       </SectionShell>
 
-      {/* Inter-City */}
-      <SectionShell icon={TrendingUp} title="Inter-City Pricing" subtitle="Distance-based fare rules for cross-city bookings">
+      {/* Inter-City surcharges */}
+      <SectionShell icon={TrendingUp} title="Inter-City Surcharges" subtitle="Layered on top of Vehicle Pricing above for cross-city bookings">
         <div className="space-y-6">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-neutral-400 mb-3">
-              <Percent size={12} /> Rate &amp; Fees
+              <Percent size={12} /> Fees
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <NumberField label="Base Rate / KM" prefix="₹" value={config.interCity.baseRatePerKm} onChange={(v) => updateInterCity("baseRatePerKm", v)} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <NumberField label="Fuel Surcharge" suffix="%" value={config.interCity.fuelSurcharge} onChange={(v) => updateInterCity("fuelSurcharge", v)} />
               <NumberField label="Platform Fee" suffix="%" value={config.interCity.platformFee} onChange={(v) => updateInterCity("platformFee", v)} />
             </div>
@@ -365,6 +545,18 @@ export default function Pricing() {
                 <NumberField label="Fixed Toll Amount" prefix="₹" value={config.interCity.tollFixedAmount} onChange={(v) => updateInterCity("tollFixedAmount", v)} />
               )}
             </div>
+          </div>
+
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-neutral-400 mb-3">
+              <Package size={12} /> Part-Load Reference Rate
+            </p>
+            <div className="max-w-xs">
+              <NumberField label="Full-Truck Cost / KM" prefix="₹" value={config.interCity.baseRatePerKm} onChange={(v) => updateInterCity("baseRatePerKm", v)} />
+            </div>
+            <p className="text-[11px] text-neutral-400 mt-2">
+              Only used as the reference "full truck" linehaul cost for Part-Load pricing below (Cost = this × distance × capacity used %) — no longer drives regular full-truck fares, which now come entirely from Vehicle Pricing above.
+            </p>
           </div>
         </div>
         <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
@@ -491,7 +683,7 @@ export default function Pricing() {
             />
           </div>
           <p className="text-xs text-neutral-400">
-            The overage charge reuses each truck category&apos;s existing Waiting/hr rate (Intra-City Pricing above) — no separate rate to configure.
+            The overage charge reuses each truck's Waiting/hr rate (Waiting Charge &amp; Platform Fee above) — no separate rate to configure.
           </p>
         </div>
         <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ClipboardEdit, MapPin, Package, User } from 'lucide-react';
 import { api, getToken } from '../services/api';
+import { TRUCK_TYPES, truckTypeLabel } from '../lib/truckTypes';
 
-const TRUCK_CATEGORIES = ['small', 'medium', 'large', 'part'];
+const TRUCK_CATEGORIES = [...TRUCK_TYPES.map((t) => t.value), 'part'];
 
 function bookingRef(b) {
   return b?.bookingNumber || (b?.id ? `#${b.id.slice(0, 8)}` : '—');
@@ -16,7 +17,7 @@ function bookingToForm(b) {
     clientEmail: b?.clientEmail || '',
     pickup: b?.pickup || '',
     drop: b?.drop || '',
-    truckCategory: b?.truckCategory || 'small',
+    truckCategory: b?.truckCategory || '14ft',
     material: b?.material || '',
     weight: b?.weight != null ? String(b.weight) : '',
     weightUnit: b?.weightUnit || 'kg',
@@ -157,7 +158,7 @@ export default function EditBooking() {
               <div>
                 <label className="form-label">Truck Type</label>
                 <select value={form.truckCategory} onChange={(e) => setField('truckCategory', e.target.value)} className="form-select">
-                  {TRUCK_CATEGORIES.map((c) => <option key={c} value={c}>{c[0].toUpperCase() + c.slice(1)}</option>)}
+                  {TRUCK_CATEGORIES.map((c) => <option key={c} value={c}>{c === 'part' ? 'Part Truck' : truckTypeLabel(c)}</option>)}
                 </select>
               </div>
               <div>
