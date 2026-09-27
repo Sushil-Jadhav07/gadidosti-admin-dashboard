@@ -7,6 +7,7 @@ import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
+import { PAGE_KEYS } from '../utils/permissions';
 
 const KYC_LABEL = {
   pending: 'Pending',
@@ -83,6 +84,10 @@ export default function Users() {
   const [addError, setAddError] = useState('');
   const [addingUser, setAddingUser] = useState(false);
 
+  const [permPages, setPermPages] = useState([]);
+  const [savingPerm, setSavingPerm] = useState(false);
+  const [permError, setPermError] = useState('');
+
   const showToast = (message, type = 'success') => setToast({ message, type });
 
   const fetchUsers = useCallback(async (pg, q, role, status, kycStatus) => {
@@ -112,6 +117,14 @@ export default function Users() {
   useEffect(() => {
     fetchUsers(page, search, roleFilter, statusFilter, kycFilter);
   }, [page, roleFilter, statusFilter, kycFilter, fetchUsers]);
+
+  // Re-seeds the page-access checkboxes whenever a different user is opened (or this same one's
+  // record is refreshed after a save) — keyed on id + the permissions array itself so a fresh
+  // save's response (which replaces selectedUser) is reflected without a stale edit lingering.
+  useEffect(() => {
+    setPermPages(selectedUser?.page_permissions || []);
+    setPermError('');
+  }, [selectedUser?.id, selectedUser?.page_permissions]);
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -144,6 +157,27 @@ export default function Users() {
       showToast('Network error — could not update status', 'error');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const togglePermPage = (key) => {
+    setPermPages((current) => (current.includes(key) ? current.filter((k) => k !== key) : [...current, key]));
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedUser) return;
+    setSavingPerm(true);
+    setPermError('');
+    try {
+      const data = await api.patch(`/api/admin/users/${selectedUser.id}/permissions`, { pages: permPages }, getToken());
+      if (!data.success) throw new Error(data.message || 'Failed to update page access');
+      setSelectedUser(data.data.user);
+      setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, page_permissions: data.data.user.page_permissions } : u)));
+      showToast('Page access updated');
+    } catch (err) {
+      setPermError(err.message || 'Failed to update page access');
+    } finally {
+      setSavingPerm(false);
     }
   };
 
@@ -623,6 +657,34 @@ export default function Users() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {selectedUser.role === 'staff' && (
+              <div className="border-t border-neutral-100 pt-4">
+                <p className="text-xs font-semibold text-neutral-500 mb-2.5">Page Access</p>
+                <p className="text-xs text-neutral-400 mb-3">Only checked pages are reachable for this account — nothing is granted by default.</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {PAGE_KEYS.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 text-sm text-neutral-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={permPages.includes(key)}
+                        onChange={() => togglePermPage(key)}
+                        className="rounded border-neutral-300 text-primary focus:ring-primary/30"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {permError && <p className="text-sm text-danger mt-2.5">{permError}</p>}
+                <button
+                  onClick={handleSavePermissions}
+                  disabled={savingPerm}
+                  className="btn-primary text-sm py-2 px-4 mt-3 disabled:opacity-50"
+                >
+                  {savingPerm ? 'Saving...' : 'Save Access'}
+                </button>
               </div>
             )}
 

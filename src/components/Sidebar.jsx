@@ -4,35 +4,36 @@ import {
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
   Settings, Radar, Receipt, MessageCircle, CalendarClock,
 } from 'lucide-react';
+import { hasPageAccess } from '../utils/permissions';
 
 const sections = [
   {
     label: 'Main',
-    items: [{ path: '/', label: 'Dashboard', icon: LayoutDashboard }],
+    items: [{ path: '/', label: 'Dashboard', icon: LayoutDashboard, pageKey: 'dashboard' }],
   },
   {
     label: 'Operations',
     items: [
-      { path: '/bookings', label: 'Bookings', icon: ClipboardList },
-      { path: '/drivers', label: 'Drivers', icon: CarFront },
-      { path: '/trucks', label: 'Trucks', icon: Truck },
-      { path: '/tracking', label: 'Live Tracking', icon: Radar },
-      { path: '/chats', label: 'Chats', subLabel: 'Trip conversations', icon: MessageCircle },
-      { path: '/monthly-hiring', label: 'Monthly Hiring', subLabel: 'Enquiries & listings', icon: CalendarClock },
+      { path: '/bookings', label: 'Bookings', icon: ClipboardList, pageKey: 'bookings' },
+      { path: '/drivers', label: 'Drivers', icon: CarFront, pageKey: 'drivers' },
+      { path: '/trucks', label: 'Trucks', icon: Truck, pageKey: 'trucks' },
+      { path: '/tracking', label: 'Live Tracking', icon: Radar, pageKey: 'tracking' },
+      { path: '/chats', label: 'Chats', subLabel: 'Trip conversations', icon: MessageCircle, pageKey: 'chats' },
+      { path: '/monthly-hiring', label: 'Monthly Hiring', subLabel: 'Enquiries & listings', icon: CalendarClock, pageKey: 'monthly_hiring' },
     ],
   },
   {
     label: 'Management',
     items: [
-      { path: '/users', label: 'Users', icon: Users },
-      { path: '/brokers', label: 'Brokers', icon: Building2 },
-      { path: '/pricing', label: 'Pricing', icon: IndianRupee },
+      { path: '/users', label: 'Users', icon: Users, pageKey: 'users' },
+      { path: '/brokers', label: 'Brokers', icon: Building2, pageKey: 'brokers' },
+      { path: '/pricing', label: 'Pricing', icon: IndianRupee, pageKey: 'pricing' },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { path: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
+      { path: '/invoices', label: 'Invoices & Receipts', icon: Receipt, pageKey: 'invoices' },
     ],
   },
   {
@@ -42,21 +43,21 @@ const sections = [
     // of screen even though they're backed by different tables.
     label: 'Issues & Disputes',
     items: [
-      { path: '/incidents', label: 'Incidents', subLabel: 'Reported by drivers', icon: AlertTriangle },
-      { path: '/disputes', label: 'Disputes', subLabel: 'Raised by broker/client', icon: Flag },
+      { path: '/incidents', label: 'Incidents', subLabel: 'Reported by drivers', icon: AlertTriangle, pageKey: 'incidents' },
+      { path: '/disputes', label: 'Disputes', subLabel: 'Raised by broker/client', icon: Flag, pageKey: 'disputes' },
     ],
   },
   {
     label: 'Compliance',
     items: [
-      { path: '/kyc', label: 'KYC', icon: ShieldCheck },
+      { path: '/kyc', label: 'KYC', icon: ShieldCheck, pageKey: 'kyc' },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-      { path: '/settings', label: 'Settings', icon: Settings },
+      { path: '/analytics', label: 'Analytics', icon: BarChart3, pageKey: 'analytics' },
+      { path: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings' },
     ],
   },
 ];
@@ -64,11 +65,17 @@ const sections = [
 // Always rendered at full width — there used to be a hover-to-expand / icon-only collapsed
 // mode here, but the sidebar is now always open, so that state machine (and the props that
 // drove it from App.jsx) was dropped rather than left in as dead code.
-export default function Sidebar() {
+export default function Sidebar({ user }) {
   const location = useLocation();
 
   const isActive = (path) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+
+  // A staff account only sees the pages it's been granted — drops a section entirely once every
+  // item in it is filtered out, rather than showing an empty header.
+  const visibleSections = sections
+    .map((section) => ({ ...section, items: section.items.filter((item) => hasPageAccess(user, item.pageKey)) }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-primary z-40 flex flex-col">
@@ -81,7 +88,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-3 overflow-y-auto no-scrollbar">
-        {sections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label} className="mb-1">
             <p className="px-4 py-2 text-[10px] font-semibold text-white/50 uppercase tracking-widest">
               {section.label}

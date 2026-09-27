@@ -1,5 +1,6 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ShieldAlert } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Toast from './components/Toast';
@@ -28,8 +29,27 @@ import MonthlyHiring from './pages/MonthlyHiring';
 import Login from './pages/Login';
 import { api } from './services/api';
 import { requestFcmToken, onForegroundMessage } from './lib/firebase';
+import { hasPageAccess } from './utils/permissions';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// Gates a single page for the 'staff' role (see utils/permissions.js) — 'admin' always passes.
+// A staff account with zero pages granted lands here for every route, including '/', which is
+// exactly the "contact your admin" state a brand-new staff account should see.
+function PageGuard({ user, pageKey, children }) {
+  if (hasPageAccess(user, pageKey)) return children;
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="bg-white rounded-2xl shadow-card px-8 py-10 max-w-sm text-center">
+        <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <ShieldAlert size={22} className="text-danger" />
+        </div>
+        <h3 className="font-semibold text-neutral-800 mb-1">You don&apos;t have access to this page</h3>
+        <p className="text-sm text-neutral-400">Ask an admin to grant it from the Users page.</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [authData, setAuthData] = useState(() => {
@@ -167,46 +187,48 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  const user = authData?.user;
+
   return (
     <div className="min-h-screen bg-[#F6F8F7]">
       <div className="hidden lg:block">
-        <Sidebar />
+        <Sidebar user={user} />
       </div>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)}></div>
           <div className="absolute left-0 top-0 h-full">
-            <Sidebar />
+            <Sidebar user={user} />
           </div>
         </div>
       )}
 
       <div className="lg:ml-64">
-        <TopBar onMenuClick={toggleMobile} onLogout={handleLogout} user={authData?.user} />
+        <TopBar onMenuClick={toggleMobile} onLogout={handleLogout} user={user} />
         <main className="px-4 pt-4 pb-8 lg:px-6 lg:pt-5 lg:pb-1 min-h-[calc(100vh-4rem)]">
           <Routes>
-            <Route path="/"          element={<Dashboard />} />
-            <Route path="/bookings"  element={<Bookings />} />
-            <Route path="/bookings/:id/edit" element={<EditBooking />} />
-            <Route path="/bookings/:id" element={<ViewBooking />} />
-            <Route path="/users"     element={<Users />} />
-            <Route path="/brokers"   element={<Brokers />} />
-            <Route path="/drivers"   element={<Drivers />} />
-            <Route path="/drivers/create" element={<CreateDriver />} />
-            <Route path="/trucks"    element={<Trucks />} />
-            <Route path="/trucks/create" element={<RegisterTruck />} />
-            <Route path="/tracking"        element={<Tracking />} />
-            <Route path="/tracking/:imei"  element={<TrackingDetail />} />
-            <Route path="/invoices"  element={<Invoices />} />
-            <Route path="/chats"     element={<Chats />} />
-            <Route path="/monthly-hiring" element={<MonthlyHiring />} />
-            <Route path="/pricing"   element={<Pricing />} />
-            <Route path="/disputes"  element={<Disputes />} />
-            <Route path="/incidents" element={<Incidents />} />
-            <Route path="/kyc"       element={<KYC />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/settings"  element={<Settings />} />
+            <Route path="/"          element={<PageGuard user={user} pageKey="dashboard"><Dashboard /></PageGuard>} />
+            <Route path="/bookings"  element={<PageGuard user={user} pageKey="bookings"><Bookings /></PageGuard>} />
+            <Route path="/bookings/:id/edit" element={<PageGuard user={user} pageKey="bookings"><EditBooking /></PageGuard>} />
+            <Route path="/bookings/:id" element={<PageGuard user={user} pageKey="bookings"><ViewBooking /></PageGuard>} />
+            <Route path="/users"     element={<PageGuard user={user} pageKey="users"><Users /></PageGuard>} />
+            <Route path="/brokers"   element={<PageGuard user={user} pageKey="brokers"><Brokers /></PageGuard>} />
+            <Route path="/drivers"   element={<PageGuard user={user} pageKey="drivers"><Drivers /></PageGuard>} />
+            <Route path="/drivers/create" element={<PageGuard user={user} pageKey="drivers"><CreateDriver /></PageGuard>} />
+            <Route path="/trucks"    element={<PageGuard user={user} pageKey="trucks"><Trucks /></PageGuard>} />
+            <Route path="/trucks/create" element={<PageGuard user={user} pageKey="trucks"><RegisterTruck /></PageGuard>} />
+            <Route path="/tracking"        element={<PageGuard user={user} pageKey="tracking"><Tracking /></PageGuard>} />
+            <Route path="/tracking/:imei"  element={<PageGuard user={user} pageKey="tracking"><TrackingDetail /></PageGuard>} />
+            <Route path="/invoices"  element={<PageGuard user={user} pageKey="invoices"><Invoices /></PageGuard>} />
+            <Route path="/chats"     element={<PageGuard user={user} pageKey="chats"><Chats /></PageGuard>} />
+            <Route path="/monthly-hiring" element={<PageGuard user={user} pageKey="monthly_hiring"><MonthlyHiring /></PageGuard>} />
+            <Route path="/pricing"   element={<PageGuard user={user} pageKey="pricing"><Pricing /></PageGuard>} />
+            <Route path="/disputes"  element={<PageGuard user={user} pageKey="disputes"><Disputes /></PageGuard>} />
+            <Route path="/incidents" element={<PageGuard user={user} pageKey="incidents"><Incidents /></PageGuard>} />
+            <Route path="/kyc"       element={<PageGuard user={user} pageKey="kyc"><KYC /></PageGuard>} />
+            <Route path="/analytics" element={<PageGuard user={user} pageKey="analytics"><Analytics /></PageGuard>} />
+            <Route path="/settings"  element={<PageGuard user={user} pageKey="settings"><Settings /></PageGuard>} />
           </Routes>
         </main>
       </div>
