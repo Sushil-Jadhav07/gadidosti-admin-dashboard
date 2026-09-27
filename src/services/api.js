@@ -1,5 +1,18 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// A 422 validation failure's `message` is always the generic "Validation failed" — the actually
+// useful, field-specific reason lives in `errors[].msg` instead. Every call site just does
+// `throw new Error(res.message)`, so folding the specific reason into `message` here — the one
+// place every request passes through — fixes it everywhere at once, with no changes needed at
+// any individual call site.
+const withValidationDetail = (data) => {
+  if (data?.success === false && Array.isArray(data.errors) && data.errors.length > 0) {
+    const detail = data.errors.map((e) => e?.msg).filter(Boolean).join('; ');
+    if (detail) data.message = detail;
+  }
+  return data;
+};
+
 const request = async (method, path, body, token) => {
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -9,7 +22,7 @@ const request = async (method, path, body, token) => {
     },
     ...(body && { body: JSON.stringify(body) }),
   });
-  return res.json();
+  return withValidationDetail(await res.json());
 };
 
 // Fetches a protected file (e.g. a KYC document) as a blob. Plain <a href> tags can't
