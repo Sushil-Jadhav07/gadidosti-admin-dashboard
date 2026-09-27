@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { CalendarClock, RefreshCw, ChevronDown } from 'lucide-react';
 import { api, getToken } from '../services/api';
+import { truckTypeLabel } from '../lib/truckTypes';
 
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
@@ -132,7 +133,7 @@ export default function MonthlyHiring() {
                   <th>Client</th>
                   <th>Location</th>
                   <th>Category</th>
-                  <th>Duration</th>
+                  <th>Start – End</th>
                   <th>Pricing</th>
                   <th>Budget</th>
                   <th>Description</th>
@@ -154,8 +155,8 @@ export default function MonthlyHiring() {
                       <p className="text-xs text-neutral-400 leading-tight">{e.clientPhone}</p>
                     </td>
                     <td className="text-sm max-w-[160px] truncate" title={e.location}>{e.location}</td>
-                    <td className="text-sm">{e.truckCategory ? cap(e.truckCategory) : '—'}</td>
-                    <td className="text-sm whitespace-nowrap">{e.durationMonths ? `${e.durationMonths} mo` : '—'}</td>
+                    <td className="text-sm">{e.truckCategory ? truckTypeLabel(e.truckCategory) : '—'}</td>
+                    <td className="text-sm whitespace-nowrap">{e.startDate && e.endDate ? `${fmtDate(e.startDate)} – ${fmtDate(e.endDate)}` : '—'}</td>
                     <td className="text-sm whitespace-nowrap">{e.pricingType === 'per_km' ? 'Per KM' : 'Fixed'}</td>
                     <td className="text-sm whitespace-nowrap">{e.budgetAmount != null ? `₹${e.budgetAmount.toLocaleString('en-IN')}` : '—'}</td>
                     <td className="text-sm max-w-[220px] truncate" title={e.description || ''}>{e.description || '—'}</td>
