@@ -6,10 +6,10 @@ import Toast from '../components/Toast';
 import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 import { TRUCK_IMAGES } from '../lib/truckImages';
-import { TRUCK_TYPES, truckTypeLabel } from '../lib/truckTypes';
+import { TRUCK_TYPES, TRUCK_BODY_TYPES, truckTypeLabel } from '../lib/truckTypes';
 
 const REGISTRATION_REGEX = /^[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{1,4}$/i;
-const EMPTY_FORM = { brokerId: '', registration: '', category: '14ft', capacity: TRUCK_TYPES.find((t) => t.value === '14ft')?.capacity || '', make: '', year: '', insuranceExpiry: '' };
+const EMPTY_FORM = { brokerId: '', registration: '', category: '14ft', capacity: TRUCK_TYPES.find((t) => t.value === '14ft')?.capacity || '', make: '', year: '', insuranceExpiry: '', bodyType: '' };
 
 const CATEGORY_COPY = {
   '3_wheeler': 'Tight lanes, light local drops',
@@ -20,6 +20,8 @@ const CATEGORY_COPY = {
   '17ft': 'Heavier regional dispatch',
   '19ft': 'High-volume long-haul capacity',
   '22ft': 'Maximum capacity, long-haul',
+  '32ft_sxl': 'Single-axle container, high-volume long-haul',
+  '32ft_mxl': 'Multi-axle container, maximum capacity long-haul',
 };
 
 export default function RegisterTruck() {
@@ -64,6 +66,7 @@ export default function RegisterTruck() {
         make: form.make.trim() || undefined,
         year: Number(form.year) || undefined,
         insurance_expiry: form.insuranceExpiry || undefined,
+        body_type: form.bodyType || undefined,
       }, getToken());
       if (!res.success) throw new Error(res.message || 'Failed to register truck');
       setToast({ message: `${form.registration.trim()} registered successfully`, type: 'success' });
@@ -149,13 +152,21 @@ export default function RegisterTruck() {
                   placeholder="2023"
                 />
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <label className="form-label">Insurance Expiry</label>
                 <input
                   type="date"
                   value={form.insuranceExpiry}
                   onChange={(event) => setField('insuranceExpiry', event.target.value)}
                   className="form-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Truck Structure</label>
+                <SelectDropdown
+                  options={[{ value: '', label: 'Not specified' }, ...TRUCK_BODY_TYPES]}
+                  value={form.bodyType}
+                  onChange={(v) => setField('bodyType', v)}
                 />
               </div>
             </div>

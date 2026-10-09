@@ -34,13 +34,15 @@ const DEFAULT_VEHICLE_PRICING = {
   "17ft":        { minimumFare: 2700, ratesByBand: [160, 100, 128, 36, 21, 21, 21, 21] },
   "19ft":        { minimumFare: 3800, ratesByBand: [210, 122, 146, 40, 23, 23, 23, 23] },
   "22ft":        { minimumFare: 4400, ratesByBand: [250, 142, 161, 43, 25, 25, 25, 25] },
+  "32ft_sxl":    { minimumFare: 5500, ratesByBand: [290, 165, 185, 48, 28, 28, 28, 28] },
+  "32ft_mxl":    { minimumFare: 7000, ratesByBand: [340, 195, 215, 55, 32, 32, 32, 32] },
 };
 
 // Mirrors gadidosti-backend's pricing.model.js DEFAULT_REGION_RATES / DEFAULT_REGION_ZONES.
 const DEFAULT_REGION_RATES = {
-  southEast:    { "3_wheeler": 17, tata_ace: 18, pickup_8ft: 20, pickup_10ft: 22, "14ft": 25, "17ft": 26, "19ft": 28, "22ft": 30 },
-  guwahatiSide: { "3_wheeler": 20, tata_ace: 21, pickup_8ft: 23, pickup_10ft: 24, "14ft": 27, "17ft": 29, "19ft": 31, "22ft": 33 },
-  kerala:       { "3_wheeler": 22, tata_ace: 25, pickup_8ft: 26, pickup_10ft: 26, "14ft": 29, "17ft": 31, "19ft": 33, "22ft": 35 },
+  southEast:    { "3_wheeler": 17, tata_ace: 18, pickup_8ft: 20, pickup_10ft: 22, "14ft": 25, "17ft": 26, "19ft": 28, "22ft": 30, "32ft_sxl": 33, "32ft_mxl": 37 },
+  guwahatiSide: { "3_wheeler": 20, tata_ace: 21, pickup_8ft: 23, pickup_10ft: 24, "14ft": 27, "17ft": 29, "19ft": 31, "22ft": 33, "32ft_sxl": 36, "32ft_mxl": 40 },
+  kerala:       { "3_wheeler": 22, tata_ace: 25, pickup_8ft: 26, pickup_10ft: 26, "14ft": 29, "17ft": 31, "19ft": 33, "22ft": 35, "32ft_sxl": 38, "32ft_mxl": 42 },
 };
 const DEFAULT_REGION_ZONES = {
   southEast: ["Tamil Nadu", "Andhra Pradesh", "Telangana", "Karnataka", "Puducherry"],
@@ -62,7 +64,7 @@ const REGION_META = {
 const BUCKET_META = {
   small: { label: "Small-size trucks", hint: "3 Wheeler, Tata Ace, Pickup 8ft", color: "#166534" },
   medium: { label: "Medium-size trucks", hint: "Pickup 10ft, 14ft", color: "#17D86B" },
-  large: { label: "Large-size trucks", hint: "17ft, 19ft, 22ft", color: "#F59E0B" },
+  large: { label: "Large-size trucks", hint: "17ft, 19ft, 22ft, 32ft SXL, 32ft MXL", color: "#F59E0B" },
 };
 const DEFAULT_BUCKET = { platformFee: 0, waitingCharge: 0 };
 

@@ -47,6 +47,7 @@ export const CATEGORY_COLOR = {
   small: '#166534', medium: '#17D86B', large: '#F59E0B', part: '#64748B',
   '3_wheeler': '#0EA5E9', tata_ace: '#166534', pickup_8ft: '#17D86B', pickup_10ft: '#0D9488',
   '14ft': '#F59E0B', '17ft': '#F97316', '19ft': '#DC2626', '22ft': '#7C3AED',
+  '32ft_sxl': '#DB2777', '32ft_mxl': '#9333EA',
 };
 
 // Real booking statuses grouped into the 4 buckets the Order Overview card summarizes —

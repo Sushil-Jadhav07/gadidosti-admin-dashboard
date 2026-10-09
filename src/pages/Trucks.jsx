@@ -8,7 +8,7 @@ import Toast from '../components/Toast';
 import SelectDropdown from '../components/SelectDropdown';
 import { api, getToken } from '../services/api';
 import { TRUCK_IMAGES } from '../lib/truckImages';
-import { TRUCK_TYPES, truckTypeLabel } from '../lib/truckTypes';
+import { TRUCK_TYPES, TRUCK_BODY_TYPES, truckTypeLabel } from '../lib/truckTypes';
 
 const STATUS_META = {
   available: { label: 'Available', color: '#17D86B' },
@@ -27,6 +27,7 @@ const typeOptionsFor = (current) =>
   (current && !TYPE_OPTIONS.includes(current) ? [...TYPE_OPTIONS, current] : TYPE_OPTIONS)
     .map((v) => ({ value: v, label: typeLabel(v) }));
 const STATUS_DROPDOWN_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }));
+const BODY_TYPE_DROPDOWN_OPTIONS = [{ value: '', label: 'Not specified' }, ...TRUCK_BODY_TYPES];
 
 function isInsuranceExpiring(dateStr) {
   if (!dateStr) return false;
@@ -70,6 +71,7 @@ function mapTruck(t) {
     make: t.make || '—',
     year: t.year || '—',
     capacity: t.capacity || '—',
+    bodyType: t.bodyType || '',
     broker: shortId(t.brokerId),
     driver: t.driver || '—',
     driverId: t.driverId,
@@ -155,6 +157,7 @@ export default function Trucks() {
       year: stripPlaceholder(truck.year),
       insuranceExpiry: truck.insuranceExpiry ? String(truck.insuranceExpiry).slice(0, 10) : '',
       status: truck.status,
+      bodyType: truck.bodyType || '',
     });
     setEditError('');
   };
@@ -175,6 +178,7 @@ export default function Trucks() {
         year: editForm.year ? Number(editForm.year) : undefined,
         insurance_expiry: editForm.insuranceExpiry || undefined,
         status: editForm.status || undefined,
+        body_type: editForm.bodyType || undefined,
       }, getToken());
       if (!res.success) throw new Error(res.message || 'Failed to update truck');
       const updated = mapTruck(res.data.truck);
@@ -462,6 +466,10 @@ export default function Trucks() {
             <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
               <span className="text-neutral-500">Driver</span><span className="font-medium">{selectedTruck.driver}</span>
             </div>
+            <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
+              <span className="text-neutral-500">Truck Structure</span>
+              <span className="font-medium">{TRUCK_BODY_TYPES.find((b) => b.value === selectedTruck.bodyType)?.label || 'Not specified'}</span>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -494,13 +502,23 @@ export default function Trucks() {
               </div>
             </div>
 
-            <div>
-              <label className="form-label">Status</label>
-              <SelectDropdown
-                options={STATUS_DROPDOWN_OPTIONS}
-                value={editForm.status}
-                onChange={(v) => setEditForm((f) => ({ ...f, status: v }))}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Status</label>
+                <SelectDropdown
+                  options={STATUS_DROPDOWN_OPTIONS}
+                  value={editForm.status}
+                  onChange={(v) => setEditForm((f) => ({ ...f, status: v }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">Truck Structure</label>
+                <SelectDropdown
+                  options={BODY_TYPE_DROPDOWN_OPTIONS}
+                  value={editForm.bodyType}
+                  onChange={(v) => setEditForm((f) => ({ ...f, bodyType: v }))}
+                />
+              </div>
             </div>
 
             {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
