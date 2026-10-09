@@ -9,7 +9,7 @@ import { TRUCK_IMAGES } from '../lib/truckImages';
 import { TRUCK_TYPES, TRUCK_BODY_TYPES, truckTypeLabel } from '../lib/truckTypes';
 
 const REGISTRATION_REGEX = /^[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{1,4}$/i;
-const EMPTY_FORM = { brokerId: '', registration: '', category: '14ft', capacity: TRUCK_TYPES.find((t) => t.value === '14ft')?.capacity || '', make: '', year: '', insuranceExpiry: '', bodyType: '' };
+const EMPTY_FORM = { brokerId: '', registration: '', category: '14ft', capacity: TRUCK_TYPES.find((t) => t.value === '14ft')?.capacity || '', make: '', year: '', insuranceExpiry: '', bodyType: '', capacityTons: '' };
 
 const CATEGORY_COPY = {
   '3_wheeler': 'Tight lanes, light local drops',
@@ -67,6 +67,7 @@ export default function RegisterTruck() {
         year: Number(form.year) || undefined,
         insurance_expiry: form.insuranceExpiry || undefined,
         body_type: form.bodyType || undefined,
+        capacity_tons: form.capacityTons ? Number(form.capacityTons) : undefined,
       }, getToken());
       if (!res.success) throw new Error(res.message || 'Failed to register truck');
       setToast({ message: `${form.registration.trim()} registered successfully`, type: 'success' });
@@ -168,6 +169,19 @@ export default function RegisterTruck() {
                   value={form.bodyType}
                   onChange={(v) => setField('bodyType', v)}
                 />
+              </div>
+              <div>
+                <label className="form-label">Capacity (tons)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={form.capacityTons}
+                  onChange={(event) => setField('capacityTons', event.target.value)}
+                  className="form-input"
+                  placeholder="e.g. 18"
+                />
+                <p className="mt-1 text-[11px] text-neutral-400">Used for part-load matching — how many tons this truck can carry, as a number (separate from the capacity label above).</p>
               </div>
             </div>
 

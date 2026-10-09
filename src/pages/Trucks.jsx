@@ -72,6 +72,7 @@ function mapTruck(t) {
     year: t.year || '—',
     capacity: t.capacity || '—',
     bodyType: t.bodyType || '',
+    capacityTons: t.capacityTons != null ? t.capacityTons : null,
     broker: shortId(t.brokerId),
     driver: t.driver || '—',
     driverId: t.driverId,
@@ -158,6 +159,7 @@ export default function Trucks() {
       insuranceExpiry: truck.insuranceExpiry ? String(truck.insuranceExpiry).slice(0, 10) : '',
       status: truck.status,
       bodyType: truck.bodyType || '',
+      capacityTons: truck.capacityTons != null ? String(truck.capacityTons) : '',
     });
     setEditError('');
   };
@@ -179,6 +181,7 @@ export default function Trucks() {
         insurance_expiry: editForm.insuranceExpiry || undefined,
         status: editForm.status || undefined,
         body_type: editForm.bodyType || undefined,
+        capacity_tons: editForm.capacityTons ? Number(editForm.capacityTons) : undefined,
       }, getToken());
       if (!res.success) throw new Error(res.message || 'Failed to update truck');
       const updated = mapTruck(res.data.truck);
@@ -483,6 +486,10 @@ export default function Trucks() {
               <div>
                 <label className="form-label">Capacity</label>
                 <input value={editForm.capacity} onChange={(e) => setEditForm((f) => ({ ...f, capacity: e.target.value }))} className="form-input" placeholder="e.g. 10 tons" />
+              </div>
+              <div>
+                <label className="form-label">Capacity (tons)</label>
+                <input type="number" min="0.01" step="0.01" value={editForm.capacityTons} onChange={(e) => setEditForm((f) => ({ ...f, capacityTons: e.target.value }))} className="form-input" placeholder="e.g. 18" />
               </div>
             </div>
 
