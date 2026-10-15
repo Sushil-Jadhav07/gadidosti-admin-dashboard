@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { FileText, Pencil, Inbox, CheckCircle, XCircle, Clock, Mail, Phone } from 'lucide-react';
+import { FileText, Pencil, Inbox, CheckCircle, XCircle, Clock, Mail, Phone, UserX, AlertTriangle } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
@@ -82,6 +82,10 @@ export default function LegalPages() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [requestNotes, setRequestNotes] = useState('');
   const [updatingRequest, setUpdatingRequest] = useState(false);
+  // Delete Account is destructive enough to want a deliberate second tap — this gates showing
+  // the "are you sure" panel in place of the normal action row, reset whenever a different
+  // request is opened so it never carries over from one to the next.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const fetchRequests = useCallback(async () => {
     setRequestsLoading(true);
@@ -111,6 +115,7 @@ export default function LegalPages() {
   const openRequest = (request) => {
     setSelectedRequest(request);
     setRequestNotes(request.adminNotes || '');
+    setConfirmingDelete(false);
   };
 
   const handleUpdateRequest = async (status) => {
@@ -124,6 +129,28 @@ export default function LegalPages() {
       setSelectedRequest(null);
     } catch (err) {
       setToast({ message: err.message || 'Failed to update request', type: 'error' });
+    } finally {
+      setUpdatingRequest(false);
+    }
+  };
+
+  // The real "Delete" action — soft-deletes the request's linked account (same semantics as
+  // Users' own "Delete User") and marks the request completed, in one backend call. Only ever
+  // reachable when selectedRequest.userId is set; the button that leads here is hidden/disabled
+  // otherwise (see the modal below).
+  const handleDeleteAccount = async () => {
+    if (!selectedRequest) return;
+    setUpdatingRequest(true);
+    try {
+      const res = await api.post(`/api/account-deletion-requests/${selectedRequest.id}/delete-account`, { admin_notes: requestNotes }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to delete account');
+      const updated = res.data.request;
+      setRequests((current) => current.map((r) => (r.id === selectedRequest.id ? updated : r)));
+      setToast({ message: `${updated.linkedUser?.name || 'Account'} deleted`, type: 'success' });
+      setSelectedRequest(null);
+      setConfirmingDelete(false);
+    } catch (err) {
+      setToast({ message: err.message || 'Failed to delete account', type: 'error' });
     } finally {
       setUpdatingRequest(false);
     }
@@ -306,6 +333,25 @@ export default function LegalPages() {
                 <div><span className="text-neutral-500">Reason</span><p className="mt-1 text-neutral-700">{selectedRequest.reason}</p></div>
               )}
             </div>
+
+            {/* Linked account — only present for a request submitted from inside the app (the
+                old public/logged-out form has no way to resolve a real account). Shows CURRENT
+                status, not a snapshot, since it could've changed since the request was filed. */}
+            {selectedRequest.userId ? (
+              <div className={`rounded-lg p-4 text-sm border ${selectedRequest.linkedUser?.status === 'inactive' ? 'bg-neutral-50 border-neutral-200' : 'bg-blue-50 border-blue-100'}`}>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Linked Account</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-neutral-800">{selectedRequest.linkedUser?.name}</span>
+                  <Badge status={selectedRequest.linkedUser?.status === 'inactive' ? 'Inactive' : selectedRequest.linkedUser?.status === 'blocked' ? 'Blocked' : 'Active'} />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-700 flex items-start gap-2">
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                No account linked to this request (submitted before login, or from the public page) — to actually delete the account, find it in Users and delete it from there.
+              </div>
+            )}
+
             <div>
               <label className="form-label">Admin Notes</label>
               <textarea
@@ -316,16 +362,41 @@ export default function LegalPages() {
                 className="form-input resize-none"
                 maxLength={2000}
               />
-              <p className="text-xs text-neutral-400 mt-1">Marking this as Completed/Rejected only records the outcome here — delete or anonymize the actual account through Users first, if applicable.</p>
             </div>
+
+            {confirmingDelete ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                <p className="text-sm text-red-700">
+                  Delete <span className="font-semibold">{selectedRequest.linkedUser?.name}</span>'s account? This deactivates it immediately — they won't be able to log in again.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setConfirmingDelete(false)} disabled={updatingRequest} className="btn-secondary">Cancel</button>
+                  <button onClick={handleDeleteAccount} disabled={updatingRequest} className="px-4 py-2 text-sm font-semibold text-white bg-danger rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-1.5">
+                    <UserX size={15} /> {updatingRequest ? 'Deleting...' : 'Yes, Delete Account'}
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="flex justify-end gap-2">
               <button onClick={() => handleUpdateRequest('rejected')} disabled={updatingRequest} className="btn-secondary flex items-center gap-1.5">
                 <XCircle size={15} /> Reject
               </button>
-              <button onClick={() => handleUpdateRequest('completed')} disabled={updatingRequest} className="btn-primary flex items-center gap-1.5">
-                <CheckCircle size={15} /> Mark Completed
-              </button>
+              {selectedRequest.userId ? (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  disabled={updatingRequest || selectedRequest.linkedUser?.status === 'inactive'}
+                  title={selectedRequest.linkedUser?.status === 'inactive' ? 'Already deactivated' : ''}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-danger rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  <UserX size={15} /> {selectedRequest.linkedUser?.status === 'inactive' ? 'Already Deleted' : 'Delete Account'}
+                </button>
+              ) : (
+                <button onClick={() => handleUpdateRequest('completed')} disabled={updatingRequest} className="btn-primary flex items-center gap-1.5">
+                  <CheckCircle size={15} /> Mark Completed
+                </button>
+              )}
             </div>
+            )}
           </div>
         )}
       </Modal>
