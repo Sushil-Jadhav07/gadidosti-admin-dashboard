@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",
+    "@tiptap/extension-link": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
     "firebase": "^12.17.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

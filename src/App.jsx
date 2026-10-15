@@ -17,6 +17,7 @@ import CreateDriver from './pages/CreateDriver';
 import RegisterTruck from './pages/RegisterTruck';
 import Pricing from './pages/Pricing';
 import Disputes from './pages/Disputes';
+import LegalPages from './pages/LegalPages';
 import Incidents from './pages/Incidents';
 import KYC from './pages/KYC';
 import Analytics from './pages/Analytics';
@@ -229,6 +230,7 @@ export default function App() {
             <Route path="/kyc"       element={<PageGuard user={user} pageKey="kyc"><KYC /></PageGuard>} />
             <Route path="/analytics" element={<PageGuard user={user} pageKey="analytics"><Analytics /></PageGuard>} />
             <Route path="/settings"  element={<PageGuard user={user} pageKey="settings"><Settings /></PageGuard>} />
+            <Route path="/legal-pages" element={<PageGuard user={user} pageKey="legal_pages"><LegalPages /></PageGuard>} />
           </Routes>
         </main>
       </div>

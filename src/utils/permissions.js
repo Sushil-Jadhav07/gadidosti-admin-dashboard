@@ -17,6 +17,7 @@ export const PAGE_KEYS = [
   { key: 'kyc', label: 'KYC' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'settings', label: 'Settings' },
+  { key: 'legal_pages', label: 'Legal Pages' },
 ];
 
 // admin = always full access (superadmin, never checked). staff = only what's been explicitly

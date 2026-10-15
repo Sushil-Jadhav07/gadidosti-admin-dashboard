@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
-  Settings, Radar, Receipt, MessageCircle, CalendarClock,
+  Settings, Radar, Receipt, MessageCircle, CalendarClock, FileText,
 } from 'lucide-react';
 import { hasPageAccess } from '../utils/permissions';
 
@@ -51,6 +51,7 @@ const sections = [
     label: 'Compliance',
     items: [
       { path: '/kyc', label: 'KYC', icon: ShieldCheck, pageKey: 'kyc' },
+      { path: '/legal-pages', label: 'Legal Pages', subLabel: 'Privacy, Terms, Deletion requests', icon: FileText, pageKey: 'legal_pages' },
     ],
   },
   {
