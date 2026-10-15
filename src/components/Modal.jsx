@@ -32,7 +32,12 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
             </button>
           </div>
         )}
-        <div className="p-6 overflow-y-auto">{children}</div>
+        {/* flex-1 min-h-0 is what actually makes this scroll — without it, a flex child with no
+            explicit height just grows to fit its content (overflow-y-auto never activates), and
+            the outer wrapper's max-h-[90vh] + overflow-hidden silently clips anything past that
+            height with no way to reach it at all (exactly what a tall modal — e.g. Legal Pages'
+            rich-text editor — hit: its Save/Cancel row was clipped off, not just unscrolled). */}
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   );
