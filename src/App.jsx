@@ -21,6 +21,8 @@ import LegalPages from './pages/LegalPages';
 import Incidents from './pages/Incidents';
 import KYC from './pages/KYC';
 import Geofencing from './pages/Geofencing';
+import Payouts from './pages/Payouts';
+import PostpaidBills from './pages/PostpaidBills';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Tracking from './pages/Tracking';
@@ -235,6 +237,10 @@ export default function App() {
             {/* Deliberately never added to ADMIN_PAGE_KEYS/PAGE_KEYS — this pageKey can never be
                 granted to 'staff', so hasPageAccess only ever passes for the plain 'admin' role. */}
             <Route path="/geofencing" element={<PageGuard user={user} pageKey="geofencing"><Geofencing /></PageGuard>} />
+            {/* Same superadmin-only reasoning as geofencing — handles real money (payout logging,
+                commission overrides), never staff-grantable. */}
+            <Route path="/payouts" element={<PageGuard user={user} pageKey="payouts"><Payouts /></PageGuard>} />
+            <Route path="/postpaid-bills" element={<PageGuard user={user} pageKey="postpaid_bills"><PostpaidBills /></PageGuard>} />
           </Routes>
         </main>
       </div>

@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
-  Settings, Radar, Receipt, MessageCircle, CalendarClock, FileText, MapPinned,
+  Settings, Radar, Receipt, MessageCircle, CalendarClock, FileText, MapPinned, Send,
 } from 'lucide-react';
 import { hasPageAccess } from '../utils/permissions';
 
@@ -37,6 +37,9 @@ const sections = [
     label: 'Finance',
     items: [
       { path: '/invoices', label: 'Invoices & Receipts', icon: Receipt, pageKey: 'invoices' },
+      // Superadmin-only, same reasoning as Geofencing — handles real money.
+      { path: '/payouts', label: 'Payouts', subLabel: 'Commission & earnings', icon: Send, pageKey: 'payouts' },
+      { path: '/postpaid-bills', label: 'Postpaid Bills', subLabel: 'Billing & credit limits', icon: Receipt, pageKey: 'postpaid_bills' },
     ],
   },
   {

@@ -88,6 +88,11 @@ export default function Users() {
   const [savingPerm, setSavingPerm] = useState(false);
   const [permError, setPermError] = useState('');
 
+  const [billingType, setBillingType] = useState('prepaid');
+  const [creditLimitDraft, setCreditLimitDraft] = useState('50000');
+  const [savingBilling, setSavingBilling] = useState(false);
+  const [billingError, setBillingError] = useState('');
+
   const showToast = (message, type = 'success') => setToast({ message, type });
 
   const fetchUsers = useCallback(async (pg, q, role, status, kycStatus) => {
@@ -125,6 +130,40 @@ export default function Users() {
     setPermPages(selectedUser?.page_permissions || []);
     setPermError('');
   }, [selectedUser?.id, selectedUser?.page_permissions]);
+
+  // Re-seeds the billing-type form whenever a different client is opened — credit limit drafts
+  // to the existing value if they're already postpaid, otherwise the ₹50,000 default.
+  useEffect(() => {
+    setBillingType(selectedUser?.billing_type || 'prepaid');
+    setCreditLimitDraft(selectedUser?.credit_limit != null ? String(selectedUser.credit_limit) : '50000');
+    setBillingError('');
+  }, [selectedUser?.id, selectedUser?.billing_type, selectedUser?.credit_limit]);
+
+  const handleSaveBillingType = async () => {
+    if (!selectedUser) return;
+    setBillingError('');
+    const payload = { billing_type: billingType };
+    if (billingType === 'postpaid') {
+      const limit = Number(creditLimitDraft);
+      if (!(limit > 0)) {
+        setBillingError('Enter a valid credit limit greater than 0');
+        return;
+      }
+      payload.credit_limit = limit;
+    }
+    setSavingBilling(true);
+    try {
+      const data = await api.patch(`/api/admin/users/${selectedUser.id}/billing-type`, payload, getToken());
+      if (!data.success) throw new Error(data.message);
+      setSelectedUser((prev) => ({ ...prev, ...data.data.user }));
+      setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, ...data.data.user } : u)));
+      showToast(billingType === 'postpaid' ? 'Switched to postpaid' : 'Switched to prepaid');
+    } catch (err) {
+      setBillingError(err.message || 'Failed to update billing type');
+    } finally {
+      setSavingBilling(false);
+    }
+  };
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -657,6 +696,52 @@ export default function Users() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {selectedUser.role === 'client' && (
+              <div className="border-t border-neutral-100 pt-4">
+                <p className="text-xs font-semibold text-neutral-500 mb-2.5">Billing Type</p>
+                <div className="flex gap-2 mb-3">
+                  {['prepaid', 'postpaid'].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setBillingType(t)}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg capitalize transition-colors ${
+                        billingType === t ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                {billingType === 'postpaid' && (
+                  <div className="mb-3">
+                    <label className="text-xs text-neutral-500 mb-1 block">Credit Limit (₹)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={creditLimitDraft}
+                      onChange={(e) => setCreditLimitDraft(e.target.value)}
+                      className="w-40 text-sm border border-neutral-200 rounded-lg px-3 py-2 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      Bookings skip payment and accumulate against this limit. Once reached, a bill is raised and further bookings are blocked until it's paid.
+                    </p>
+                  </div>
+                )}
+                {billingError && <p className="text-sm text-danger mb-2.5">{billingError}</p>}
+                <button
+                  onClick={handleSaveBillingType}
+                  disabled={
+                    savingBilling ||
+                    (billingType === (selectedUser.billing_type || 'prepaid') &&
+                      (billingType !== 'postpaid' || Number(creditLimitDraft) === Number(selectedUser.credit_limit || 0)))
+                  }
+                  className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                >
+                  {savingBilling ? 'Saving...' : 'Save Billing Type'}
+                </button>
               </div>
             )}
 
