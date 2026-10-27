@@ -20,6 +20,7 @@ import Disputes from './pages/Disputes';
 import LegalPages from './pages/LegalPages';
 import Incidents from './pages/Incidents';
 import KYC from './pages/KYC';
+import Geofencing from './pages/Geofencing';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Tracking from './pages/Tracking';
@@ -231,6 +232,9 @@ export default function App() {
             <Route path="/analytics" element={<PageGuard user={user} pageKey="analytics"><Analytics /></PageGuard>} />
             <Route path="/settings"  element={<PageGuard user={user} pageKey="settings"><Settings /></PageGuard>} />
             <Route path="/legal-pages" element={<PageGuard user={user} pageKey="legal_pages"><LegalPages /></PageGuard>} />
+            {/* Deliberately never added to ADMIN_PAGE_KEYS/PAGE_KEYS — this pageKey can never be
+                granted to 'staff', so hasPageAccess only ever passes for the plain 'admin' role. */}
+            <Route path="/geofencing" element={<PageGuard user={user} pageKey="geofencing"><Geofencing /></PageGuard>} />
           </Routes>
         </main>
       </div>

@@ -66,15 +66,20 @@ const BUCKET_META = {
   medium: { label: "Medium-size trucks", hint: "Pickup 10ft, 14ft", color: "#17D86B" },
   large: { label: "Large-size trucks", hint: "17ft, 19ft, 22ft, 32ft SXL, 32ft MXL", color: "#F59E0B" },
 };
-const DEFAULT_BUCKET = { platformFee: 0, waitingCharge: 0 };
+const DEFAULT_BUCKET = { waitingCharge: 0 };
+
+// Mirrors gadidosti-backend's pricing.model.js DEFAULT_SERVICE_CHARGE exactly — replaces the old
+// per-bucket platformFee percentages below with one global tiered rule.
+const DEFAULT_SERVICE_CHARGE = { threshold: 10000, lowRate: 0.07, highRate: 0.05 };
 
 const DEFAULT_CONFIG = {
   vehiclePricing: DEFAULT_VEHICLE_PRICING,
   regionRates: DEFAULT_REGION_RATES,
   regionZones: DEFAULT_REGION_ZONES,
   intraCity: { small: { ...DEFAULT_BUCKET }, medium: { ...DEFAULT_BUCKET }, large: { ...DEFAULT_BUCKET } },
-  interCity: { baseRatePerKm: 0, fuelSurcharge: 0, platformFee: 0, tollHandling: "actual", tollFixedAmount: 0 },
-  partTruck: { platformFee: 0 },
+  interCity: { baseRatePerKm: 0, fuelSurcharge: 0, tollHandling: "actual", tollFixedAmount: 0 },
+  partTruck: {},
+  serviceCharge: DEFAULT_SERVICE_CHARGE,
   // Freight payment stages: "Advance" always offers *some* amount now (no longer gated behind
   // a minimum booking size) — three tiers by booking amount, first two flat, the top one a
   // percentage. Mirrors gadidosti-backend's pricing.model.js DEFAULT_ADVANCE_TIERS exactly;
@@ -253,8 +258,7 @@ function BucketCard({ bucket, data, onChange }) {
           <p className="text-[11px] text-neutral-400">{meta.hint}</p>
         </div>
       </div>
-      <div className="p-5 grid grid-cols-2 gap-3">
-        <NumberField label="Platform Fee" suffix="%" value={data.platformFee} onChange={set("platformFee")} />
+      <div className="p-5">
         <NumberField label="Waiting/hr" prefix="₹" value={data.waitingCharge} onChange={set("waitingCharge")} />
       </div>
     </div>
@@ -323,6 +327,7 @@ export default function Pricing() {
           },
           interCity: { ...DEFAULT_CONFIG.interCity, ...(remote.interCity || {}) },
           partTruck: { ...DEFAULT_CONFIG.partTruck, ...(remote.partTruck || {}) },
+          serviceCharge: { ...DEFAULT_SERVICE_CHARGE, ...(remote.serviceCharge || {}) },
           advanceRule: {
             tiers: remote.advanceRule?.tiers?.length === 3 ? remote.advanceRule.tiers : DEFAULT_CONFIG.advanceRule.tiers,
           },
@@ -386,8 +391,8 @@ export default function Pricing() {
     setConfig((current) => ({ ...current, interCity: { ...current.interCity, [field]: value } }));
   };
 
-  const updatePartTruck = (field, value) => {
-    setConfig((current) => ({ ...current, partTruck: { ...current.partTruck, [field]: value } }));
+  const updateServiceCharge = (field, value) => {
+    setConfig((current) => ({ ...current, serviceCharge: { ...current.serviceCharge, [field]: value } }));
   };
 
   // index 0/1 are the two flat tiers (each has its own maxAmount ceiling); index 2 is the
@@ -500,8 +505,8 @@ export default function Pricing() {
         </div>
       </SectionShell>
 
-      {/* Waiting Charge & Platform Fee (legacy size buckets — still drive halting rate + fee) */}
-      <SectionShell icon={IndianRupee} title="Waiting Charge & Platform Fee" subtitle="By size bucket — every truck type above resolves to whichever of these 3 it's closest in size to.">
+      {/* Waiting Charge (legacy size buckets — still drive the halting/delay overage rate) */}
+      <SectionShell icon={IndianRupee} title="Waiting Charge" subtitle="By size bucket — every truck type above resolves to whichever of these 3 it's closest in size to.">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {["small", "medium", "large"].map((bucket) => (
             <BucketCard key={bucket} bucket={bucket} data={config.intraCity[bucket]} onChange={updateBucket} />
@@ -510,6 +515,38 @@ export default function Pricing() {
         <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
           <button onClick={() => save("intraCity")} disabled={savingSection === "intraCity"} className="btn-primary">
             {savingSection === "intraCity" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </SectionShell>
+
+      {/* Service Charge — global tiered rule, replaces the old per-bucket platform fees above */}
+      <SectionShell icon={Percent} title="Service Charge" subtitle="Replaces the old per-bucket platform fee — one tiered rule applied to every booking (intra-city, inter-city, and part-load alike)">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <NumberField
+            label="Threshold"
+            prefix="₹"
+            value={config.serviceCharge.threshold}
+            onChange={(v) => updateServiceCharge("threshold", v)}
+          />
+          <NumberField
+            label="Rate at or below threshold"
+            suffix="%"
+            value={Math.round(Number(config.serviceCharge.lowRate) * 100)}
+            onChange={(v) => updateServiceCharge("lowRate", Math.max(0, v) / 100)}
+          />
+          <NumberField
+            label="Rate above threshold"
+            suffix="%"
+            value={Math.round(Number(config.serviceCharge.highRate) * 100)}
+            onChange={(v) => updateServiceCharge("highRate", Math.max(0, v) / 100)}
+          />
+        </div>
+        <p className="text-xs text-neutral-400 mt-3">
+          E.g. a ₹{Number(config.serviceCharge.threshold).toLocaleString("en-IN")} order is charged {Math.round(Number(config.serviceCharge.lowRate) * 100)}%; anything above that is charged {Math.round(Number(config.serviceCharge.highRate) * 100)}%.
+        </p>
+        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
+          <button onClick={() => save("serviceCharge")} disabled={savingSection === "serviceCharge"} className="btn-primary">
+            {savingSection === "serviceCharge" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
           </button>
         </div>
       </SectionShell>
@@ -523,7 +560,6 @@ export default function Pricing() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <NumberField label="Fuel Surcharge" suffix="%" value={config.interCity.fuelSurcharge} onChange={(v) => updateInterCity("fuelSurcharge", v)} />
-              <NumberField label="Platform Fee" suffix="%" value={config.interCity.platformFee} onChange={(v) => updateInterCity("platformFee", v)} />
             </div>
           </div>
 
@@ -570,19 +606,10 @@ export default function Pricing() {
 
       {/* Part Truck */}
       <SectionShell icon={Package} title="Part Truck Pricing" subtitle="Shared-load bookings billed by capacity used">
-        <div className="space-y-5">
-          <div className="border border-neutral-200 rounded-xl p-4">
-            <p className="text-sm font-medium text-neutral-700 mb-1">Pricing Formula</p>
-            <p className="text-sm font-mono font-semibold text-primary">Cost = Total Truck Cost x Capacity Used %</p>
-          </div>
-          <div className="max-w-xs">
-            <NumberField label="Platform Fee" suffix="%" value={config.partTruck.platformFee} onChange={(v) => updatePartTruck("platformFee", v)} />
-          </div>
-        </div>
-        <div className="flex justify-end pt-5 mt-5 border-t border-neutral-100">
-          <button onClick={() => save("partTruck")} disabled={savingSection === "partTruck"} className="btn-primary">
-            {savingSection === "partTruck" ? <><Spinner />Saving...</> : <><Save size={15} />Save Changes</>}
-          </button>
+        <div className="border border-neutral-200 rounded-xl p-4">
+          <p className="text-sm font-medium text-neutral-700 mb-1">Pricing Formula</p>
+          <p className="text-sm font-mono font-semibold text-primary">Cost = Total Truck Cost x Capacity Used %</p>
+          <p className="text-xs text-neutral-400 mt-2">The Service Charge below applies on top of this, same as every other booking type.</p>
         </div>
       </SectionShell>
 

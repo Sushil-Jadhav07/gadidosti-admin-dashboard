@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, Building2, Truck,
   CarFront, IndianRupee, AlertTriangle, Flag, ShieldCheck, BarChart3,
-  Settings, Radar, Receipt, MessageCircle, CalendarClock, FileText,
+  Settings, Radar, Receipt, MessageCircle, CalendarClock, FileText, MapPinned,
 } from 'lucide-react';
 import { hasPageAccess } from '../utils/permissions';
 
@@ -28,6 +28,9 @@ const sections = [
       { path: '/users', label: 'Users', icon: Users, pageKey: 'users' },
       { path: '/brokers', label: 'Brokers', icon: Building2, pageKey: 'brokers' },
       { path: '/pricing', label: 'Pricing', icon: IndianRupee, pageKey: 'pricing' },
+      // pageKey deliberately never added to PAGE_KEYS — hasPageAccess only ever passes for the
+      // plain 'admin' role, never 'staff' (superadmin-only, see Geofencing.jsx).
+      { path: '/geofencing', label: 'Geofencing', subLabel: 'Pincode whitelist', icon: MapPinned, pageKey: 'geofencing' },
     ],
   },
   {

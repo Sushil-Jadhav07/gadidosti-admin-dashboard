@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, CheckCircle, XCircle, ChevronLeft, ChevronRight, FileText, ShieldCheck, Loader2, ImageOff } from 'lucide-react';
+import { Search, CheckCircle, XCircle, ChevronLeft, ChevronRight, FileText, ShieldCheck, Loader2, ImageOff, BadgeCheck } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import Toast from '../components/Toast';
@@ -75,6 +75,7 @@ function mapBroker(s) {
     aadhaar: d.aadhaar_number || '—',
     aadhaarPhotoUrl: d.aadhaar_photo_url || null,
     gst: d.gst_number || '—',
+    gstVerified: s.verification_results?.gst?.status === 'verified',
     bankAccount: d.bank_account_number || '—',
     businessReg: d.business_registration_number || null,
     submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
@@ -94,6 +95,8 @@ function mapDriver(s) {
     licensePhotoUrl: d.license_photo_url || null,
     aadhaar: d.aadhaar_number || '—',
     aadhaarPhotoUrl: d.aadhaar_photo_url || null,
+    gst: d.gst_number || '—',
+    gstVerified: s.verification_results?.gst?.status === 'verified',
     vehicleReg: d.vehicle_registration_number || null,
     vehicleIns: d.vehicle_insurance_number || null,
     submissionDate: s.submitted_at ? s.submitted_at.slice(0, 10) : '—',
@@ -102,6 +105,18 @@ function mapDriver(s) {
     reviewerName: s.reviewer_name || null,
     reviewerRole: s.reviewer_role || null,
   };
+}
+
+// First instance of surfacing an automated verification-provider result in this page (PAN/
+// Aadhaar never got one) — a small additive check mark next to the raw GST number, not a
+// restructure of the table.
+function GstCell({ value, verified }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {value}
+      {verified && <BadgeCheck size={12} className="text-tertiary flex-shrink-0" />}
+    </span>
+  );
 }
 
 export default function KYC() {
@@ -271,6 +286,7 @@ export default function KYC() {
                     <>
                       <th>Driving License</th>
                       <th>Aadhaar</th>
+                      <th>GST</th>
                       <th>Vehicle Reg.</th>
                       <th>Vehicle Insurance</th>
                     </>
@@ -282,7 +298,7 @@ export default function KYC() {
               </thead>
               <tbody>
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={activeTab === 'brokers' ? 9 : 8} className="text-center py-10 text-neutral-400 text-sm">No {activeTab.slice(0, -1)} KYC submissions found</td></tr>
+                  <tr><td colSpan={activeTab === 'brokers' ? 9 : 9} className="text-center py-10 text-neutral-400 text-sm">No {activeTab.slice(0, -1)} KYC submissions found</td></tr>
                 ) : paginated.map((kyc) => (
                   <tr key={kyc.id}>
                     <td className="font-medium whitespace-nowrap">{kyc.name}</td>
@@ -290,7 +306,7 @@ export default function KYC() {
                       <>
                         <td className="text-xs whitespace-nowrap">{kyc.pan}</td>
                         <td className="text-xs whitespace-nowrap">{kyc.aadhaar}</td>
-                        <td className="text-xs whitespace-nowrap">{kyc.gst}</td>
+                        <td className="text-xs whitespace-nowrap"><GstCell value={kyc.gst} verified={kyc.gstVerified} /></td>
                         <td className="text-xs whitespace-nowrap">{kyc.bankAccount}</td>
                         <td>{kyc.businessReg || '-'}</td>
                       </>
@@ -298,6 +314,7 @@ export default function KYC() {
                       <>
                         <td className="text-xs whitespace-nowrap">{kyc.licenseNo}</td>
                         <td className="text-xs whitespace-nowrap">{kyc.aadhaar}</td>
+                        <td className="text-xs whitespace-nowrap"><GstCell value={kyc.gst} verified={kyc.gstVerified} /></td>
                         <td className="text-xs whitespace-nowrap">{kyc.vehicleReg || '—'}</td>
                         <td className="text-xs whitespace-nowrap">{kyc.vehicleIns || '—'}</td>
                       </>
@@ -366,13 +383,14 @@ export default function KYC() {
                 <>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">PAN</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.pan}</p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Aadhaar</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.aadhaar}</p></div>
-                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">GST</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.gst}</p></div>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">GST</span><p className="mt-1 font-medium text-neutral-800"><GstCell value={selectedKYC.gst} verified={selectedKYC.gstVerified} /></p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Bank Account</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.bankAccount}</p></div>
                 </>
               ) : (
                 <>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Driving License</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.licenseNo}</p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Aadhaar</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.aadhaar}</p></div>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">GST</span><p className="mt-1 font-medium text-neutral-800"><GstCell value={selectedKYC.gst} verified={selectedKYC.gstVerified} /></p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Vehicle Registration</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.vehicleReg || '—'}</p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Vehicle Insurance</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.vehicleIns || '—'}</p></div>
                 </>
