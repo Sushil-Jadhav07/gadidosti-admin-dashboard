@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Save, Globe, Bell, Shield, User, Lock,
-  Camera, Eye, EyeOff, Mail, Phone, IndianRupee, UserPlus, Wallet,
+  Camera, Eye, EyeOff, Mail, Phone, IndianRupee, UserPlus, Wallet, BadgeCheck, ShieldCheck,
 } from "lucide-react";
 import Toast from "../components/Toast";
 import { api, getStoredAuth, getToken } from "../services/api";
 
 const DEFAULT_SETTINGS = {
-  platformName: "SSK Logistics",
+  platformName: "Gadidost",
   contactEmail: "",
   commissionRate: 10,
   emailAlerts: true,
@@ -16,6 +16,8 @@ const DEFAULT_SETTINGS = {
   companyUpiId: "",
   companyUpiName: "",
   companyGstin: "",
+  companyLegalName: "",
+  companyGstVerifiedAt: null,
 };
 
 const tabs = [
@@ -103,6 +105,11 @@ export default function Settings() {
   const [newAdminErrors, setNewAdminErrors] = useState({});
   const [showNewAdminPw, setShowNewAdminPw] = useState(false);
   const [creatingAdmin, setCreatingAdmin] = useState(false);
+  // Draft GSTIN typed into the Company GSTIN field — separate from settings.companyGstin, which
+  // only ever updates after a successful verify (see handleVerifyGstin). Pre-filled from the
+  // already-saved value so re-opening the tab doesn't show a blank box.
+  const [gstinDraft, setGstinDraft] = useState("");
+  const [verifyingGstin, setVerifyingGstin] = useState(false);
 
   const loadToken = useCallback(() => getToken(), []);
 
@@ -144,7 +151,10 @@ export default function Settings() {
           companyUpiId: remoteSettings.companyUpiId || DEFAULT_SETTINGS.companyUpiId,
           companyUpiName: remoteSettings.companyUpiName || DEFAULT_SETTINGS.companyUpiName,
           companyGstin: remoteSettings.companyGstin || DEFAULT_SETTINGS.companyGstin,
+          companyLegalName: remoteSettings.companyLegalName || DEFAULT_SETTINGS.companyLegalName,
+          companyGstVerifiedAt: remoteSettings.companyGstVerifiedAt || DEFAULT_SETTINGS.companyGstVerifiedAt,
         });
+        setGstinDraft(remoteSettings.companyGstin || "");
       } catch {
         setToast({ message: "Failed to load settings", type: "error" });
       } finally {
@@ -208,7 +218,6 @@ export default function Settings() {
         push_notifications: settings.pushNotifications,
         company_upi_id: settings.companyUpiId,
         company_upi_name: settings.companyUpiName,
-        company_gstin: settings.companyGstin,
       }, token);
 
       if (!data.success) {
@@ -221,6 +230,36 @@ export default function Settings() {
       setToast({ message: "Network error. Please try again.", type: "error" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Company GSTIN is never free-typed into settings — it's only ever saved after this call
+  // verifies it against Cashfree and fetches the real legal business name, same check used for
+  // client/driver/broker KYC. See admin.controller.js's verifyCompanyGstin.
+  const handleVerifyGstin = async () => {
+    const token = loadToken();
+    if (!token || !gstinDraft.trim()) return;
+
+    setVerifyingGstin(true);
+    try {
+      const data = await api.post("/api/admin/settings/verify-gstin", { gstin: gstinDraft.trim().toUpperCase() }, token);
+
+      if (!data.success) {
+        setToast({ message: data.message || "GSTIN could not be verified", type: "error" });
+        return;
+      }
+
+      setSettings((current) => ({
+        ...current,
+        companyGstin: data.data.companyGstin,
+        companyLegalName: data.data.companyLegalName,
+        companyGstVerifiedAt: data.data.companyGstVerifiedAt,
+      }));
+      setToast({ message: `Verified — ${data.data.companyLegalName || data.data.companyGstin}`, type: "success" });
+    } catch {
+      setToast({ message: "Network error. Please try again.", type: "error" });
+    } finally {
+      setVerifyingGstin(false);
     }
   };
 
@@ -422,17 +461,41 @@ export default function Settings() {
                       <input type="email" value={settings.contactEmail} onChange={(event) => setSettings((current) => ({ ...current, contactEmail: event.target.value }))} className="form-input pl-10" />
                     </div>
                   </Field>
-                  <Field label="Company GSTIN" description="Printed on every tax invoice, and used to decide CGST+SGST vs IGST on the platform fee's GST breakdown">
+                </div>
+
+                <Field
+                  label="Company GSTIN"
+                  description="Verified against Cashfree (not free-typed) — the legal business name it returns is what's printed on every tax invoice, and the GST state it encodes decides CGST+SGST vs IGST on the platform fee's GST breakdown."
+                >
+                  <div className="flex flex-col sm:flex-row gap-2.5 max-w-lg">
                     <input
                       type="text"
-                      value={settings.companyGstin}
-                      onChange={(event) => setSettings((current) => ({ ...current, companyGstin: event.target.value.toUpperCase() }))}
-                      placeholder="27AAAAA0000A1Z5"
+                      value={gstinDraft}
+                      onChange={(event) => setGstinDraft(event.target.value.toUpperCase())}
+                      placeholder="07CMFPS3661A1Z6"
                       maxLength={15}
-                      className="form-input uppercase"
+                      className="form-input uppercase flex-1"
                     />
-                  </Field>
-                </div>
+                    <button
+                      onClick={handleVerifyGstin}
+                      disabled={verifyingGstin || !gstinDraft.trim()}
+                      className="btn-secondary whitespace-nowrap"
+                    >
+                      {verifyingGstin
+                        ? <><div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />Verifying...</>
+                        : <><ShieldCheck size={15} />Verify &amp; Save</>}
+                    </button>
+                  </div>
+                  {settings.companyGstin && (
+                    <div className="flex items-center gap-2 mt-2.5 text-xs text-success bg-success/5 border border-success/15 rounded-lg px-3 py-2 max-w-lg">
+                      <BadgeCheck size={15} className="flex-shrink-0" />
+                      <span>
+                        <span className="font-semibold">{settings.companyLegalName || settings.companyGstin}</span>
+                        {" "}— verified{settings.companyGstVerifiedAt ? ` on ${new Date(settings.companyGstVerifiedAt).toLocaleDateString("en-IN")}` : ""}
+                      </span>
+                    </div>
+                  )}
+                </Field>
 
                 <Field label="Platform Logo">
                   <div className="flex items-center gap-4 mt-1.5">
