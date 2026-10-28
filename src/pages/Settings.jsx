@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   pushNotifications: true,
   companyUpiId: "",
   companyUpiName: "",
+  companyGstin: "",
 };
 
 const tabs = [
@@ -142,6 +143,7 @@ export default function Settings() {
           pushNotifications: Boolean(remoteSettings.pushNotifications ?? DEFAULT_SETTINGS.pushNotifications),
           companyUpiId: remoteSettings.companyUpiId || DEFAULT_SETTINGS.companyUpiId,
           companyUpiName: remoteSettings.companyUpiName || DEFAULT_SETTINGS.companyUpiName,
+          companyGstin: remoteSettings.companyGstin || DEFAULT_SETTINGS.companyGstin,
         });
       } catch {
         setToast({ message: "Failed to load settings", type: "error" });
@@ -206,6 +208,7 @@ export default function Settings() {
         push_notifications: settings.pushNotifications,
         company_upi_id: settings.companyUpiId,
         company_upi_name: settings.companyUpiName,
+        company_gstin: settings.companyGstin,
       }, token);
 
       if (!data.success) {
@@ -418,6 +421,16 @@ export default function Settings() {
                       <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
                       <input type="email" value={settings.contactEmail} onChange={(event) => setSettings((current) => ({ ...current, contactEmail: event.target.value }))} className="form-input pl-10" />
                     </div>
+                  </Field>
+                  <Field label="Company GSTIN" description="Printed on every tax invoice, and used to decide CGST+SGST vs IGST on the platform fee's GST breakdown">
+                    <input
+                      type="text"
+                      value={settings.companyGstin}
+                      onChange={(event) => setSettings((current) => ({ ...current, companyGstin: event.target.value.toUpperCase() }))}
+                      placeholder="27AAAAA0000A1Z5"
+                      maxLength={15}
+                      className="form-input uppercase"
+                    />
                   </Field>
                 </div>
 
