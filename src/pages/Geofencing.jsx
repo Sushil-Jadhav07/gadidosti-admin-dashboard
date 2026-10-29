@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { MapPinned, Plus, Trash2, Download, Upload, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { MapPinned, Plus, Trash2, Download, Upload, FileSpreadsheet, AlertTriangle, Search, ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import Toast from "../components/Toast";
 import { api, getToken } from "../services/api";
 
@@ -36,21 +36,49 @@ export default function Geofencing() {
   const [bulkResult, setBulkResult] = useState(null);
   const fileInputRef = useRef(null);
 
-  const fetchPincodes = useCallback(async () => {
+  // Search + pagination — the list can now run into the thousands via bulk upload, so it's
+  // fetched a page at a time from the backend (see GeofenceModel.list) rather than rendered in
+  // full. Same debounced-search pattern as Users.jsx.
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const searchTimer = useRef(null);
+  const itemsPerPage = 25;
+
+  const fetchPincodes = useCallback(async (pg = page, q = search) => {
     setLoading(true);
     setError("");
     try {
-      const res = await api.get("/api/admin/geofencing/pincodes", getToken());
-      if (res.success) setPincodes(res.data?.pincodes || []);
-      else setError(res.message || "Failed to load pincodes");
+      const params = new URLSearchParams({ page: pg, limit: itemsPerPage });
+      if (q) params.append("search", q);
+      const res = await api.get(`/api/admin/geofencing/pincodes?${params}`, getToken());
+      if (res.success) {
+        setPincodes(res.data?.pincodes || []);
+        setTotal(res.data?.total || 0);
+        setTotalPages(res.data?.total_pages || 1);
+      } else {
+        setError(res.message || "Failed to load pincodes");
+      }
     } catch {
       setError("Network error — could not load pincodes");
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { fetchPincodes(); }, [fetchPincodes]);
+  useEffect(() => { fetchPincodes(page, search); }, [page, fetchPincodes]);
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearch(val);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      fetchPincodes(1, val);
+    }, 400);
+  };
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -62,10 +90,12 @@ export default function Geofencing() {
     try {
       const res = await api.post("/api/admin/geofencing/pincodes", { pincode: newPincode.trim(), label: newLabel.trim() || undefined }, getToken());
       if (res.success) {
-        setPincodes((prev) => [res.data.pincode, ...prev]);
         setNewPincode("");
         setNewLabel("");
         setToast({ message: "Pincode added", type: "success" });
+        setPage(1);
+        setSearch("");
+        fetchPincodes(1, "");
       } else {
         setToast({ message: res.message || "Failed to add pincode", type: "error" });
       }
@@ -101,12 +131,12 @@ export default function Geofencing() {
       }
       setBulkResult(res.data);
       setToast({
-        message: `${res.data.inserted} added, ${res.data.updated} updated${res.data.invalid.length ? `, ${res.data.invalid.length} skipped` : ""}`,
+        message: `${res.data.inserted} added, ${res.data.updated} updated${res.data.invalidCount ? `, ${res.data.invalidCount} invalid` : ""}${res.data.duplicateCount ? `, ${res.data.duplicateCount} duplicate` : ""}`,
         type: res.data.inserted || res.data.updated ? "success" : "error",
       });
       setUploadFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      fetchPincodes();
+      fetchPincodes(page, search);
     } catch {
       setToast({ message: "Network error — could not upload the file", type: "error" });
     } finally {
@@ -129,12 +159,27 @@ export default function Geofencing() {
     try {
       const res = await api.delete(`/api/admin/geofencing/pincodes/${id}`, getToken());
       if (!res.success) throw new Error(res.message);
-      setPincodes((prev) => prev.filter((p) => p.id !== id));
       setToast({ message: "Pincode removed", type: "success" });
+      // Deleting the last row on a page beyond the first would otherwise leave it showing
+      // nothing — fall back a page in that case; anywhere else, just drop it from the current
+      // page locally rather than a full refetch.
+      if (pincodes.length === 1 && page > 1) {
+        setPage((p) => p - 1);
+      } else {
+        setPincodes((prev) => prev.filter((p) => p.id !== id));
+        setTotal((t) => Math.max(0, t - 1));
+      }
     } catch {
       setToast({ message: "Failed to remove pincode", type: "error" });
     }
   };
+
+  const pageNumbers = Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+    if (totalPages <= 7) return i + 1;
+    if (page <= 4) return i + 1;
+    if (page >= totalPages - 3) return totalPages - 6 + i;
+    return page - 3 + i;
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -221,15 +266,39 @@ export default function Geofencing() {
               <div className="flex flex-wrap gap-4 text-sm">
                 <span className="text-success font-semibold">{bulkResult.inserted} added</span>
                 <span className="text-primary font-semibold">{bulkResult.updated} updated</span>
-                {bulkResult.invalid.length > 0 && (
-                  <span className="text-danger font-semibold">{bulkResult.invalid.length} skipped</span>
+                {bulkResult.duplicateCount > 0 && (
+                  <span className="text-amber-600 font-semibold">{bulkResult.duplicateCount} duplicate (within the file)</span>
+                )}
+                {bulkResult.invalidCount > 0 && (
+                  <span className="text-danger font-semibold">{bulkResult.invalidCount} invalid</span>
                 )}
                 <span className="text-neutral-400">of {bulkResult.totalRows} rows</span>
               </div>
-              {bulkResult.invalid.length > 0 && (
+              {bulkResult.duplicateCount > 0 && (
+                <p className="text-xs text-neutral-500">
+                  A repeated pincode is common in real pincode lists — one PIN often covers several areas. Only the
+                  last occurrence of each repeated pincode was kept; every repeat is listed below.
+                </p>
+              )}
+              {bulkResult.duplicateCount > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold text-neutral-500 flex items-center gap-1.5">
-                    <AlertTriangle size={13} className="text-danger" /> Rows skipped
+                    <Copy size={13} className="text-amber-600" /> Duplicate rows{bulkResult.duplicates.length < bulkResult.duplicateCount ? ` (showing first ${bulkResult.duplicates.length} of ${bulkResult.duplicateCount})` : ""}
+                  </p>
+                  <div className="max-h-40 overflow-y-auto divide-y divide-neutral-100 rounded-lg border border-neutral-100 bg-white">
+                    {bulkResult.duplicates.map((item, i) => (
+                      <div key={i} className="px-3 py-1.5 text-xs text-neutral-500 flex items-center justify-between gap-3">
+                        <span>Row {item.row} — {item.pincode}</span>
+                        <span className="text-amber-600">{item.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {bulkResult.invalidCount > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-neutral-500 flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="text-danger" /> Invalid rows{bulkResult.invalid.length < bulkResult.invalidCount ? ` (showing first ${bulkResult.invalid.length} of ${bulkResult.invalidCount})` : ""}
                   </p>
                   <div className="max-h-40 overflow-y-auto divide-y divide-neutral-100 rounded-lg border border-neutral-100 bg-white">
                     {bulkResult.invalid.map((item, i) => (
@@ -248,7 +317,17 @@ export default function Geofencing() {
 
       <div className="card">
         <div className="card-header">
-          <h3 className="card-title">Whitelisted pincodes ({pincodes.length})</h3>
+          <h3 className="card-title">Whitelisted pincodes ({total})</h3>
+          <div className="relative w-full sm:w-64">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search pincode or label..."
+              value={search}
+              onChange={handleSearchChange}
+              className="form-input pl-9 !py-2"
+            />
+          </div>
         </div>
         {loading ? (
           <div className="p-10 flex justify-center">
@@ -257,11 +336,11 @@ export default function Geofencing() {
         ) : error ? (
           <div className="p-4 text-sm text-danger flex items-center gap-2">
             <span>{error}</span>
-            <button onClick={fetchPincodes} className="underline">Retry</button>
+            <button onClick={() => fetchPincodes(page, search)} className="underline">Retry</button>
           </div>
         ) : pincodes.length === 0 ? (
           <div className="p-10 text-center text-sm text-neutral-400">
-            No pincodes whitelisted yet — every pincode is currently allowed.
+            {search ? `No pincodes match "${search}"` : "No pincodes whitelisted yet — every pincode is currently allowed."}
           </div>
         ) : (
           <div className="divide-y divide-neutral-100">
@@ -279,6 +358,41 @@ export default function Geofencing() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-4 border-t border-neutral-100">
+            <p className="text-sm text-neutral-500">
+              Showing {(page - 1) * itemsPerPage + 1}–{Math.min(page * itemsPerPage, total)} of {total} pincodes
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              {pageNumbers.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  onClick={() => setPage(pageNumber)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                    page === pageNumber ? "bg-primary text-white" : "text-neutral-600 hover:bg-neutral-50 border border-neutral-200"
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </div>
