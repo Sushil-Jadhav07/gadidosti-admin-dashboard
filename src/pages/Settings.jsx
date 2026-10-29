@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   companyGstin: "",
   companyLegalName: "",
   companyGstVerifiedAt: null,
+  companyDisplayName: "",
 };
 
 const tabs = [
@@ -153,6 +154,7 @@ export default function Settings() {
           companyGstin: remoteSettings.companyGstin || DEFAULT_SETTINGS.companyGstin,
           companyLegalName: remoteSettings.companyLegalName || DEFAULT_SETTINGS.companyLegalName,
           companyGstVerifiedAt: remoteSettings.companyGstVerifiedAt || DEFAULT_SETTINGS.companyGstVerifiedAt,
+          companyDisplayName: remoteSettings.companyDisplayName || DEFAULT_SETTINGS.companyDisplayName,
         });
         setGstinDraft(remoteSettings.companyGstin || "");
       } catch {
@@ -218,6 +220,7 @@ export default function Settings() {
         push_notifications: settings.pushNotifications,
         company_upi_id: settings.companyUpiId,
         company_upi_name: settings.companyUpiName,
+        company_display_name: settings.companyDisplayName,
       }, token);
 
       if (!data.success) {
@@ -461,6 +464,18 @@ export default function Settings() {
                       <input type="email" value={settings.contactEmail} onChange={(event) => setSettings((current) => ({ ...current, contactEmail: event.target.value }))} className="form-input pl-10" />
                     </div>
                   </Field>
+                  <Field
+                    label="Company Name (on invoice/Bilty)"
+                    description="Shown on tax invoices and Bilty documents ahead of the GST-verified legal name below, so it's never blocked by that verification succeeding."
+                  >
+                    <input
+                      type="text"
+                      value={settings.companyDisplayName}
+                      onChange={(event) => setSettings((current) => ({ ...current, companyDisplayName: event.target.value }))}
+                      placeholder="SSK Logistics"
+                      className="form-input"
+                    />
+                  </Field>
                 </div>
 
                 <Field
@@ -486,12 +501,21 @@ export default function Settings() {
                         : <><ShieldCheck size={15} />Verify &amp; Save</>}
                     </button>
                   </div>
-                  {settings.companyGstin && (
+                  {settings.companyGstin && settings.companyGstVerifiedAt && (
                     <div className="flex items-center gap-2 mt-2.5 text-xs text-success bg-success/5 border border-success/15 rounded-lg px-3 py-2 max-w-lg">
                       <BadgeCheck size={15} className="flex-shrink-0" />
                       <span>
                         <span className="font-semibold">{settings.companyLegalName || settings.companyGstin}</span>
-                        {" "}— verified{settings.companyGstVerifiedAt ? ` on ${new Date(settings.companyGstVerifiedAt).toLocaleDateString("en-IN")}` : ""}
+                        {" "}— verified on {new Date(settings.companyGstVerifiedAt).toLocaleDateString("en-IN")}
+                      </span>
+                    </div>
+                  )}
+                  {settings.companyGstin && !settings.companyGstVerifiedAt && (
+                    <div className="flex items-center gap-2 mt-2.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-lg">
+                      <ShieldCheck size={15} className="flex-shrink-0" />
+                      <span>
+                        <span className="font-semibold">{settings.companyGstin}</span> is saved but not yet verified — click Verify &amp; Save
+                        once Cashfree is reachable to confirm it and fetch the legal business name.
                       </span>
                     </div>
                   )}
