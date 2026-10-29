@@ -35,6 +35,36 @@ const getFileBlobUrl = async (url, token) => {
   return URL.createObjectURL(blob);
 };
 
+// Downloads a protected file and saves it under `filename` — same auth problem as
+// getFileBlobUrl (a plain <a href> can't carry the token), plus a blob: URL on its own loses
+// the server's Content-Disposition filename once opened, so this drives the save itself via a
+// throwaway <a download> instead of just handing back the URL.
+const downloadFile = async (url, token, filename) => {
+  const res = await fetch(url, { headers: { ...(token && { Authorization: `Bearer ${token}` }) } });
+  if (!res.ok) throw new Error(`Failed to download file (${res.status})`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+};
+
+// Multipart upload (FormData) — deliberately NOT going through request() above, which always
+// JSON.stringifies the body and sets Content-Type: application/json; a multipart boundary has
+// to come from the browser itself, so Content-Type is left unset here on purpose.
+const postFile = async (path, formData, token) => {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+    body: formData,
+  });
+  return withValidationDetail(await res.json());
+};
+
 export const api = {
   post:   (path, body, token) => request('POST',   path, body, token),
   get:    (path, token)       => request('GET',    path, null, token),
@@ -42,6 +72,8 @@ export const api = {
   patch:  (path, body, token) => request('PATCH',  path, body, token),
   delete: (path, token, body) => request('DELETE', path, body, token),
   getFileBlobUrl,
+  downloadFile,
+  postFile,
 };
 
 export const getStoredAuth = () => {
