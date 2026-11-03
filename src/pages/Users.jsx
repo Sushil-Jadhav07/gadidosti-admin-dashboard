@@ -75,7 +75,7 @@ export default function Users() {
   const searchTimer = useRef(null);
 
   const [editUser, setEditUser] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', email: '', address: '', companyName: '' });
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', address: '', companyName: '' });
   const [editError, setEditError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -245,6 +245,7 @@ export default function Users() {
     setEditForm({
       name: user.name || '',
       email: user.email || '',
+      phone: user.phone || '',
       address: user.address || '',
       companyName: user.company_name || '',
     });
@@ -257,12 +258,17 @@ export default function Users() {
       setEditError('Name cannot be blank.');
       return;
     }
+    if (editForm.phone && !/^\d{10}$/.test(editForm.phone)) {
+      setEditError('Phone number must be exactly 10 digits.');
+      return;
+    }
     setSavingEdit(true);
     setEditError('');
     try {
       const data = await api.patch(`/api/admin/users/${editUser.id}`, {
         name: editForm.name.trim(),
         email: editForm.email.trim() || undefined,
+        phone: editForm.phone.trim() || undefined,
         address: editForm.address.trim() || undefined,
         company_name: editForm.companyName.trim() || undefined,
       }, getToken());
@@ -823,10 +829,20 @@ export default function Users() {
               </div>
             )}
             <div>
+              <label className="form-label">Phone</label>
+              <input
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                placeholder="10-digit phone number"
+                className="form-input"
+              />
+              <p className="text-xs text-neutral-400 mt-1">Changing this resets their phone/OTP verification — they'll need to verify the new number again on next OTP login.</p>
+            </div>
+            <div>
               <label className="form-label">Address</label>
               <textarea value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} rows={2} className="form-input resize-none" />
             </div>
-            <p className="text-xs text-neutral-400">Phone number isn&apos;t editable here — it&apos;s the OTP-verified login identifier.</p>
             {editError && <div className="text-sm text-danger bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</div>}
             <div className="flex justify-end gap-2">
               <button onClick={() => setEditUser(null)} className="btn-secondary">Cancel</button>
