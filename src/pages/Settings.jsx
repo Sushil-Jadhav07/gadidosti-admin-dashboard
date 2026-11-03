@@ -132,7 +132,7 @@ export default function Settings() {
         setProfile({
           name: user.name || "",
           email: user.email || "",
-          phone: user.phone ? `+91 ${user.phone}` : "",
+          phone: user.phone || "",
           address: user.address || "",
           company_name: user.company_name || "",
           role: user.role === "admin" ? "Super Admin" : user.role || "Super Admin",
@@ -171,11 +171,17 @@ export default function Settings() {
     const token = loadToken();
     if (!token) return;
 
+    if (profile.phone && !/^\d{10}$/.test(profile.phone)) {
+      setToast({ message: "Phone number must be exactly 10 digits", type: "error" });
+      return;
+    }
+
     setSaving(true);
     try {
       const data = await api.patch("/api/users/profile", {
         name: profile.name,
         email: profile.email,
+        phone: profile.phone,
         address: profile.address,
         company_name: profile.company_name,
       }, token);
@@ -191,6 +197,7 @@ export default function Settings() {
           ...stored.user,
           name: profile.name,
           email: profile.email,
+          phone: profile.phone,
           address: profile.address,
           company_name: profile.company_name,
         };
@@ -423,10 +430,16 @@ export default function Settings() {
                           <input type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} className="form-input pl-10" />
                         </div>
                       </Field>
-                      <Field label="Phone Number" description="Contact support to change phone number">
+                      <Field label="Phone Number">
                         <div className="relative">
                           <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                          <input type="tel" value={profile.phone} readOnly className="form-input pl-10 bg-neutral-50 text-neutral-400 cursor-not-allowed" />
+                          <input
+                            type="tel"
+                            value={profile.phone}
+                            onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                            placeholder="10-digit phone number"
+                            className="form-input pl-10"
+                          />
                         </div>
                       </Field>
                       <Field label="Company / Organization">
