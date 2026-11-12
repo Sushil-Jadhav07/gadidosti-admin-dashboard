@@ -1,5 +1,27 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Plain `fetch` has no timeout of its own — if the backend is slow to respond or briefly
+// unreachable (a cold DB connection, a deploy in progress), a request just hangs forever with
+// no error and no way out, which is exactly what "stuck on the login screen" turned out to be:
+// the login button's loading spinner never clears because the underlying fetch() never resolves
+// OR rejects. Wrapping every call in an AbortController-based timeout guarantees it does one or
+// the other within a bounded time. Uploads get a longer budget since a document can legitimately
+// take longer than a plain JSON call.
+const DEFAULT_TIMEOUT_MS = 20000;
+const UPLOAD_TIMEOUT_MS = 60000;
+const fetchWithTimeout = async (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Request timed out — please check your connection and try again.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 // A 422 validation failure's `message` is always the generic "Validation failed" — the actually
 // useful, field-specific reason lives in `errors[].msg` instead. Every call site just does
 // `throw new Error(res.message)`, so folding the specific reason into `message` here — the one
@@ -14,7 +36,7 @@ const withValidationDetail = (data) => {
 };
 
 const request = async (method, path, body, token) => {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithTimeout(`${BASE}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -29,7 +51,7 @@ const request = async (method, path, body, token) => {
 // carry the Authorization header, so the file-serving endpoint would 401 without this —
 // fetch it here instead and hand back an object URL the browser can open/render.
 const getFileBlobUrl = async (url, token) => {
-  const res = await fetch(url, { headers: { ...(token && { Authorization: `Bearer ${token}` }) } });
+  const res = await fetchWithTimeout(url, { headers: { ...(token && { Authorization: `Bearer ${token}` }) } });
   if (!res.ok) throw new Error(`Failed to load document (${res.status})`);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
@@ -40,7 +62,7 @@ const getFileBlobUrl = async (url, token) => {
 // the server's Content-Disposition filename once opened, so this drives the save itself via a
 // throwaway <a download> instead of just handing back the URL.
 const downloadFile = async (url, token, filename) => {
-  const res = await fetch(url, { headers: { ...(token && { Authorization: `Bearer ${token}` }) } });
+  const res = await fetchWithTimeout(url, { headers: { ...(token && { Authorization: `Bearer ${token}` }) } });
   if (!res.ok) throw new Error(`Failed to download file (${res.status})`);
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);
@@ -57,11 +79,11 @@ const downloadFile = async (url, token, filename) => {
 // JSON.stringifies the body and sets Content-Type: application/json; a multipart boundary has
 // to come from the browser itself, so Content-Type is left unset here on purpose.
 const postFile = async (path, formData, token) => {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithTimeout(`${BASE}${path}`, {
     method: 'POST',
     headers: { ...(token && { Authorization: `Bearer ${token}` }) },
     body: formData,
-  });
+  }, UPLOAD_TIMEOUT_MS);
   return withValidationDetail(await res.json());
 };
 
