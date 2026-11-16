@@ -433,7 +433,10 @@ export default function Users() {
                 className="form-select !py-2 pl-3 pr-8"
               >
                 <option value="">All Statuses</option>
-                {STATUSES.slice(1).map((s) => <option key={s} value={s}>{cap(s)}</option>)}
+                {/* 'inactive' is exclusively the Delete User action's soft-delete state — there's
+                    no other way an account ends up with this status — so it's labeled "Deleted"
+                    here even though the underlying value is still 'inactive'. */}
+                {STATUSES.slice(1).map((s) => <option key={s} value={s}>{s === 'inactive' ? 'Deleted' : cap(s)}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
             </div>
