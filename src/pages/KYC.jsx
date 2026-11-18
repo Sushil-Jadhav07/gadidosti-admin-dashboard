@@ -5,7 +5,11 @@ import Modal from '../components/Modal';
 import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 
-const STATUS_LABEL = { submitted: 'Pending', verified: 'Verified', rejected: 'Rejected' };
+// 'pending' only ever shows up for the Client tab — brokers/drivers go pending -> submitted ->
+// verified/rejected, but a client auto-finalizes straight from pending to verified with no
+// submitted/review step at all, so 'pending' here just means "hasn't completed either
+// verification path yet," not "awaiting review" the way 'submitted' does for the other two.
+const STATUS_LABEL = { submitted: 'Pending', verified: 'Verified', rejected: 'Rejected', pending: 'Incomplete' };
 
 function DocumentPreview({ label, url }) {
   const [blobUrl, setBlobUrl] = useState(null);
@@ -107,6 +111,24 @@ function mapDriver(s) {
   };
 }
 
+// Clients never go through manual review (no documents/photos to look at, no Approve/Reject —
+// isKycSatisfied in kyc.controller.js auto-finalizes them), so this is read-only: just the three
+// check statuses and the overall kyc_status, for admin visibility/support, not an action queue.
+function mapClient(s) {
+  const vr = s.verification_results || {};
+  return {
+    id: s.user_id,
+    name: s.name,
+    phone: s.phone || '—',
+    email: s.email || '—',
+    aadhaarVerified: vr.aadhaar?.status === 'verified',
+    panVerified: vr.pan?.status === 'verified',
+    gstVerified: vr.gst?.status === 'verified',
+    registeredDate: s.registered_at ? s.registered_at.slice(0, 10) : '—',
+    status: STATUS_LABEL[s.kyc_status] || s.kyc_status,
+  };
+}
+
 // First instance of surfacing an automated verification-provider result in this page (PAN/
 // Aadhaar never got one) — a small additive check mark next to the raw GST number, not a
 // restructure of the table.
@@ -117,6 +139,16 @@ function GstCell({ value, verified }) {
       {verified && <BadgeCheck size={12} className="text-tertiary flex-shrink-0" />}
     </span>
   );
+}
+
+// Client tab's identity checks have no raw number to show alongside (clients never get their
+// typed/DigiLocker number copied into `documents` the way submitKyc does for broker/driver —
+// see kyc.controller.js's maybeAutoFinalizeClientKyc, which only ever touches
+// verification_results) — just whether each one passed.
+function CheckDot({ verified }) {
+  return verified
+    ? <span className="inline-flex items-center gap-1 text-tertiary text-xs font-semibold whitespace-nowrap"><BadgeCheck size={13} /> Verified</span>
+    : <span className="text-xs text-neutral-400">—</span>;
 }
 
 export default function KYC() {
@@ -130,6 +162,7 @@ export default function KYC() {
   const [toast, setToast] = useState(null);
   const [brokerData, setBrokerData] = useState([]);
   const [driverData, setDriverData] = useState([]);
+  const [clientData, setClientData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const itemsPerPage = 8;
@@ -140,13 +173,19 @@ export default function KYC() {
     setLoading(true);
     setError('');
     try {
-      const [brokerRes, driverRes] = await Promise.all([
+      // Client uses kyc_status=all — broker/driver's default (omitted) excludes 'pending', the
+      // right behavior for their real review queue, but a client's status is only ever
+      // 'pending' or 'verified' (never 'submitted'), so that default would hide every
+      // not-yet-verified client — useless for the visibility this tab exists for.
+      const [brokerRes, driverRes, clientRes] = await Promise.all([
         api.get('/api/admin/kyc/pending?role=broker&limit=100', getToken()),
         api.get('/api/admin/kyc/pending?role=driver&limit=100', getToken()),
+        api.get('/api/admin/kyc/pending?role=client&kyc_status=all&limit=100', getToken()),
       ]);
       if (brokerRes.success) setBrokerData(brokerRes.data.submissions.map(mapBroker));
       if (driverRes.success) setDriverData(driverRes.data.submissions.map(mapDriver));
-      if (!brokerRes.success || !driverRes.success) setError('Failed to load some KYC data');
+      if (clientRes.success) setClientData(clientRes.data.submissions.map(mapClient));
+      if (!brokerRes.success || !driverRes.success || !clientRes.success) setError('Failed to load some KYC data');
     } catch {
       setError('Network error — could not load KYC submissions');
     } finally {
@@ -156,8 +195,8 @@ export default function KYC() {
 
   useEffect(() => { fetchKyc(); }, [fetchKyc]);
 
-  const data = activeTab === 'brokers' ? brokerData : driverData;
-  const setData = activeTab === 'brokers' ? setBrokerData : setDriverData;
+  const data = activeTab === 'brokers' ? brokerData : activeTab === 'drivers' ? driverData : clientData;
+  const setData = activeTab === 'brokers' ? setBrokerData : activeTab === 'drivers' ? setDriverData : setClientData;
 
   const filtered = useMemo(() => data.filter((k) =>
     !searchTerm || k.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -252,6 +291,12 @@ export default function KYC() {
               >
                 Drivers ({driverData.length})
               </button>
+              <button
+                onClick={() => { setActiveTab('clients'); setCurrentPage(1); setSearchTerm(''); }}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'clients' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
+              >
+                Clients ({clientData.length})
+              </button>
             </div>
             <div className="relative w-full sm:w-72">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -266,7 +311,7 @@ export default function KYC() {
           </div>
 
           <div className="px-5 pb-2">
-            <h3 className="text-base font-poppins font-semibold text-secondary">{activeTab === 'brokers' ? 'Broker KYC' : 'Driver KYC'}</h3>
+            <h3 className="text-base font-poppins font-semibold text-secondary">{activeTab === 'brokers' ? 'Broker KYC' : activeTab === 'drivers' ? 'Driver KYC' : 'Client KYC'}</h3>
           </div>
 
           <div className="overflow-x-auto mt-3">
@@ -282,7 +327,7 @@ export default function KYC() {
                       <th>Bank Account</th>
                       <th>Business Reg.</th>
                     </>
-                  ) : (
+                  ) : activeTab === 'drivers' ? (
                     <>
                       <th>Driving License</th>
                       <th>Aadhaar</th>
@@ -290,15 +335,23 @@ export default function KYC() {
                       <th>Vehicle Reg.</th>
                       <th>Vehicle Insurance</th>
                     </>
+                  ) : (
+                    <>
+                      <th>Phone</th>
+                      <th>Email</th>
+                      <th>Aadhaar</th>
+                      <th>PAN</th>
+                      <th>GST</th>
+                    </>
                   )}
-                  <th>Submission</th>
+                  <th>{activeTab === 'clients' ? 'Registered' : 'Submission'}</th>
                   <th>Status</th>
-                  <th className="text-center">Actions</th>
+                  <th className="text-center">{activeTab === 'clients' ? 'View' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={activeTab === 'brokers' ? 9 : 9} className="text-center py-10 text-neutral-400 text-sm">No {activeTab.slice(0, -1)} KYC submissions found</td></tr>
+                  <tr><td colSpan={9} className="text-center py-10 text-neutral-400 text-sm">No {activeTab.slice(0, -1)} KYC submissions found</td></tr>
                 ) : paginated.map((kyc) => (
                   <tr key={kyc.id}>
                     <td className="font-medium whitespace-nowrap">{kyc.name}</td>
@@ -310,7 +363,7 @@ export default function KYC() {
                         <td className="text-xs whitespace-nowrap">{kyc.bankAccount}</td>
                         <td>{kyc.businessReg || '-'}</td>
                       </>
-                    ) : (
+                    ) : activeTab === 'drivers' ? (
                       <>
                         <td className="text-xs whitespace-nowrap">{kyc.licenseNo}</td>
                         <td className="text-xs whitespace-nowrap">{kyc.aadhaar}</td>
@@ -318,8 +371,16 @@ export default function KYC() {
                         <td className="text-xs whitespace-nowrap">{kyc.vehicleReg || '—'}</td>
                         <td className="text-xs whitespace-nowrap">{kyc.vehicleIns || '—'}</td>
                       </>
+                    ) : (
+                      <>
+                        <td className="text-xs whitespace-nowrap">{kyc.phone}</td>
+                        <td className="text-xs whitespace-nowrap">{kyc.email}</td>
+                        <td className="text-xs whitespace-nowrap"><CheckDot verified={kyc.aadhaarVerified} /></td>
+                        <td className="text-xs whitespace-nowrap"><CheckDot verified={kyc.panVerified} /></td>
+                        <td className="text-xs whitespace-nowrap"><CheckDot verified={kyc.gstVerified} /></td>
+                      </>
                     )}
-                    <td className="whitespace-nowrap">{kyc.submissionDate}</td>
+                    <td className="whitespace-nowrap">{activeTab === 'clients' ? kyc.registeredDate : kyc.submissionDate}</td>
                     <td>
                       <div className="flex flex-col items-start gap-1">
                         <Badge status={kyc.status} />
@@ -328,7 +389,7 @@ export default function KYC() {
                     </td>
                     <td className="text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => { setSelectedKYC(kyc); setShowRejectBox(false); }} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="View Documents">
+                        <button onClick={() => { setSelectedKYC(kyc); setShowRejectBox(false); }} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="View Details">
                           <FileText size={14} />
                         </button>
                         {kyc.status === 'Pending' && (
@@ -362,7 +423,7 @@ export default function KYC() {
         </div>
       )}
 
-      <Modal isOpen={!!selectedKYC} onClose={() => { setSelectedKYC(null); setShowRejectBox(false); setRejectReason(''); }} title={`${activeTab === 'brokers' ? 'Broker' : 'Driver'} KYC Details`} size="lg">
+      <Modal isOpen={!!selectedKYC} onClose={() => { setSelectedKYC(null); setShowRejectBox(false); setRejectReason(''); }} title={`${activeTab === 'brokers' ? 'Broker' : activeTab === 'drivers' ? 'Driver' : 'Client'} KYC Details`} size="lg">
         {selectedKYC && (
           <div className="space-y-5">
             <div className="flex items-center gap-3">
@@ -386,7 +447,7 @@ export default function KYC() {
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">GST</span><p className="mt-1 font-medium text-neutral-800"><GstCell value={selectedKYC.gst} verified={selectedKYC.gstVerified} /></p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Bank Account</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.bankAccount}</p></div>
                 </>
-              ) : (
+              ) : activeTab === 'drivers' ? (
                 <>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Driving License</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.licenseNo}</p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Aadhaar</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.aadhaar}</p></div>
@@ -394,9 +455,18 @@ export default function KYC() {
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Vehicle Registration</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.vehicleReg || '—'}</p></div>
                   <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Vehicle Insurance</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.vehicleIns || '—'}</p></div>
                 </>
+              ) : (
+                <>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Phone</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.phone}</p></div>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Email</span><p className="mt-1 font-medium text-neutral-800">{selectedKYC.email}</p></div>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">Aadhaar</span><p className="mt-1 font-medium text-neutral-800"><CheckDot verified={selectedKYC.aadhaarVerified} /></p></div>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">PAN</span><p className="mt-1 font-medium text-neutral-800"><CheckDot verified={selectedKYC.panVerified} /></p></div>
+                  <div className="bg-neutral-50 rounded-xl p-4"><span className="text-neutral-500">GST</span><p className="mt-1 font-medium text-neutral-800"><CheckDot verified={selectedKYC.gstVerified} /></p></div>
+                </>
               )}
             </div>
 
+            {activeTab !== 'clients' && (
             <div>
               <h4 className="text-sm font-semibold text-secondary mb-3">Uploaded Documents</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -413,6 +483,7 @@ export default function KYC() {
                 )}
               </div>
             </div>
+            )}
 
             {selectedKYC.rejectionReason && (
               <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-danger">
