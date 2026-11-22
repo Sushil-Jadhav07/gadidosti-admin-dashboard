@@ -388,7 +388,8 @@ function AssignDriverSection({ booking, onToast, onChanged }) {
         <div className="p-4 border-t border-primary/20 space-y-3">
           <p className="text-xs text-neutral-500">
             Pick any driver in the system, regardless of distance from pickup. This sends them a
-            request — they still need to accept it, same as any other assignment.
+            request at the booking's current price — they can accept or decline, but not
+            negotiate, since the price is already fixed once you assign it.
           </p>
           <input
             type="text"
