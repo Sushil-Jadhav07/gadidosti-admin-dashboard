@@ -15,6 +15,7 @@ const sections = [
     label: 'Operations',
     items: [
       { path: '/bookings', label: 'Bookings', icon: ClipboardList, pageKey: 'bookings' },
+      { path: '/assign-bookings', label: 'Assign Bookings', subLabel: 'Needs a driver', icon: Send, pageKey: 'bookings' },
       { path: '/drivers', label: 'Drivers', icon: CarFront, pageKey: 'drivers' },
       { path: '/trucks', label: 'Trucks', icon: Truck, pageKey: 'trucks' },
       { path: '/tracking', label: 'Live Tracking', icon: Radar, pageKey: 'tracking' },

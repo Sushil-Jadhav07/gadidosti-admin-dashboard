@@ -7,6 +7,7 @@ import Toast from './components/Toast';
 import ChatLauncher from './components/ChatLauncher';
 import Dashboard from './pages/Dashboard';
 import Bookings from './pages/Bookings';
+import AssignBookings from './pages/AssignBookings';
 import ViewBooking from './pages/ViewBooking';
 import EditBooking from './pages/EditBooking';
 import Users from './pages/Users';
@@ -214,6 +215,7 @@ export default function App() {
           <Routes>
             <Route path="/"          element={<PageGuard user={user} pageKey="dashboard"><Dashboard /></PageGuard>} />
             <Route path="/bookings"  element={<PageGuard user={user} pageKey="bookings"><Bookings /></PageGuard>} />
+            <Route path="/assign-bookings" element={<PageGuard user={user} pageKey="bookings"><AssignBookings /></PageGuard>} />
             <Route path="/bookings/:id/edit" element={<PageGuard user={user} pageKey="bookings"><EditBooking /></PageGuard>} />
             <Route path="/bookings/:id" element={<PageGuard user={user} pageKey="bookings"><ViewBooking /></PageGuard>} />
             <Route path="/users"     element={<PageGuard user={user} pageKey="users"><Users /></PageGuard>} />
