@@ -10,6 +10,7 @@ import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 import { money, bookingRef, CATEGORY_COLOR } from './Bookings';
 import { timeAgo } from '../utils/chat';
+import { useAdminBookingsSocket } from '../hooks/useAdminBookingsSocket';
 
 // One central place to assign a driver straight to any still-unassigned ("Requested") booking —
 // built so admin doesn't have to open each booking's own detail page one at a time (ViewBooking.jsx
@@ -38,24 +39,30 @@ export default function AssignBookings() {
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [assigning, setAssigning] = useState(false);
 
-  const fetchBookings = async () => {
-    setLoading(true);
+  // silent: true for the live socket-driven refetch below — skips the full-page spinner so a
+  // background update doesn't flash the list away while it's actively being looked at.
+  const fetchBookings = async ({ silent } = {}) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const res = await api.get('/api/bookings?status=pending&limit=100&sort=desc', getToken());
       if (res.success) {
         setBookings(res.data?.bookings || []);
-      } else {
+      } else if (!silent) {
         setError(res.message || 'Failed to load bookings');
       }
     } catch {
-      setError('Network error — could not load bookings');
+      if (!silent) setError('Network error — could not load bookings');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => { fetchBookings(); }, []);
+
+  // New pending booking, a pending one cancelled, or any booking just got a driver assigned —
+  // refetch so this list is always live, no manual Refresh click needed.
+  useAdminBookingsSocket(() => fetchBookings({ silent: true }));
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -126,8 +133,8 @@ export default function AssignBookings() {
             <Send size={22} className="text-primary" /> Assign Bookings
           </h1>
           <p className="text-sm text-neutral-500 mt-1">
-            Bookings still waiting for a driver — pick one directly from anywhere in the system, no
-            distance restriction. The price is fixed; the driver can accept or decline, not negotiate.
+            Bookings still waiting for a lorry owner — pick one directly from anywhere in the system, no
+            distance restriction. The price is fixed; the lorry owner can accept or decline, not negotiate.
           </p>
         </div>
         <button onClick={fetchBookings} className="btn-secondary !py-2 !px-3 text-sm flex-shrink-0">
@@ -165,11 +172,11 @@ export default function AssignBookings() {
             <CheckCircle2 size={24} className="text-emerald-500" />
           </div>
           <h3 className="text-base font-poppins font-semibold text-secondary mb-1">
-            {bookings.length === 0 ? 'Nothing waiting for a driver' : 'No matches'}
+            {bookings.length === 0 ? 'Nothing waiting for a lorry owner' : 'No matches'}
           </h3>
           <p className="text-sm text-neutral-400">
             {bookings.length === 0
-              ? 'Every booking already has a broker, driver, or request in flight.'
+              ? 'Every booking already has a broker, lorry owner, or request in flight.'
               : 'Try a different search term.'}
           </p>
         </div>
@@ -234,7 +241,7 @@ export default function AssignBookings() {
                     <IndianRupee size={16} /> {Number(booking.amount || 0).toLocaleString('en-IN')}
                   </span>
                   <button onClick={() => openAssign(booking)} className="btn-primary !py-2 !px-3.5 text-sm">
-                    <Send size={14} /> Assign Driver
+                    <Send size={14} /> Assign Lorry Owner
                   </button>
                 </div>
               </div>
@@ -243,7 +250,7 @@ export default function AssignBookings() {
         </div>
       )}
 
-      <Modal isOpen={!!assignTarget} onClose={closeAssign} title={assignTarget ? `Assign Driver — ${bookingRef(assignTarget)}` : ''} size="lg">
+      <Modal isOpen={!!assignTarget} onClose={closeAssign} title={assignTarget ? `Assign Lorry Owner — ${bookingRef(assignTarget)}` : ''} size="lg">
         {assignTarget && (
           <div className="space-y-4">
             <div className="bg-neutral-50 rounded-xl p-4 flex items-center justify-between gap-3 text-sm">
@@ -256,14 +263,14 @@ export default function AssignBookings() {
 
             <div className="flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3.5 py-3 text-xs text-indigo-800">
               <ShieldCheck size={15} className="flex-shrink-0 mt-0.5" />
-              <span>Fixed price, direct assignment — no distance restriction, and the driver can only accept or decline, not negotiate.</span>
+              <span>Fixed price, direct assignment — no distance restriction, and the lorry owner can only accept or decline, not negotiate.</span>
             </div>
 
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
-                placeholder="Search by driver name or truck registration..."
+                placeholder="Search by lorry owner name or truck registration..."
                 value={driverSearch}
                 onChange={(e) => setDriverSearch(e.target.value)}
                 className="form-input pl-9 !py-2 w-full"
@@ -275,7 +282,7 @@ export default function AssignBookings() {
                 <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
               </div>
             ) : filteredDrivers.length === 0 ? (
-              <p className="text-sm text-neutral-400 text-center py-6">No available, online drivers found.</p>
+              <p className="text-sm text-neutral-400 text-center py-6">No available, online lorry owners found.</p>
             ) : (
               <div className="max-h-72 overflow-y-auto space-y-1.5 border border-neutral-100 rounded-xl p-2">
                 {filteredDrivers.map((d) => (
