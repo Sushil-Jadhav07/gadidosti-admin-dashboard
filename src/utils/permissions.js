@@ -3,7 +3,7 @@
 export const PAGE_KEYS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'bookings', label: 'Bookings' },
-  { key: 'drivers', label: 'Drivers' },
+  { key: 'drivers', label: 'Lorry Owners' },
   { key: 'trucks', label: 'Trucks' },
   { key: 'tracking', label: 'Live Tracking' },
   { key: 'chats', label: 'Chats' },

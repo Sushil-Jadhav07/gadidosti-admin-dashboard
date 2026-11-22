@@ -16,7 +16,7 @@ const formatAadhaar = (digits) => {
 const FIELD_SPECS = [
   { key: 'name', label: 'Full Name', placeholder: 'Ramesh Kumar', required: true },
   { key: 'phone', label: 'Phone Number', placeholder: '10-digit phone number', required: true, icon: Phone },
-  { key: 'email', label: 'Email Address', placeholder: 'driver@example.com', required: true, type: 'email', icon: Mail },
+  { key: 'email', label: 'Email Address', placeholder: 'lorryowner@example.com', required: true, type: 'email', icon: Mail },
   { key: 'licenseNo', label: 'License Number', placeholder: 'MH-2020123456789', icon: IdCard },
   { key: 'licenseExpiry', label: 'License Expiry', type: 'date', icon: BadgeCheck },
 ];
@@ -66,7 +66,7 @@ export default function CreateDriver() {
 
   const validate = () => {
     const next = {};
-    if (!form.brokerId) next.brokerId = 'Select which broker this driver will belong to.';
+    if (!form.brokerId) next.brokerId = 'Select which broker this lorry owner will belong to.';
     if (!form.name.trim()) next.name = 'Name is required.';
     if (form.phone.replace(/\D/g, '').length !== 10) next.phone = 'Enter a valid 10-digit phone number.';
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
@@ -97,7 +97,7 @@ export default function CreateDriver() {
         aadhaar: aadhaarDigits.length === 12 ? aadhaarDigits : undefined,
         truck_id: form.truckId || undefined,
       }, getToken());
-      if (!res.success) throw new Error(res.message || 'Failed to register driver');
+      if (!res.success) throw new Error(res.message || 'Failed to register lorry owner');
       setResult({
         name: form.name.trim(),
         email: form.email.trim(),
@@ -105,7 +105,7 @@ export default function CreateDriver() {
       });
       setToast({ message: `${form.name.trim()} registered successfully`, type: 'success' });
     } catch (err) {
-      setToast({ message: err.message || 'Failed to register driver', type: 'error' });
+      setToast({ message: err.message || 'Failed to register lorry owner', type: 'error' });
     } finally {
       setRegistering(false);
     }
@@ -119,7 +119,7 @@ export default function CreateDriver() {
             <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-800">
               <ShieldCheck className="mt-0.5 h-5 w-5 flex-shrink-0" />
               <div>
-                <h2 className="font-poppins text-lg font-semibold">Driver created successfully</h2>
+                <h2 className="font-poppins text-lg font-semibold">Lorry owner created successfully</h2>
                 <p className="mt-1 text-sm">{result.name} is now part of the selected broker fleet.</p>
               </div>
             </div>
@@ -150,11 +150,11 @@ export default function CreateDriver() {
                   </div>
                 </div>
               </div>
-              <p className="mt-4 text-xs text-amber-600">This password is shown only once. Ask the driver to change it after first login.</p>
+              <p className="mt-4 text-xs text-amber-600">This password is shown only once. Ask the lorry owner to change it after first login.</p>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" onClick={() => navigate('/drivers')} className="btn-primary">Return To Drivers</button>
+              <button type="button" onClick={() => navigate('/drivers')} className="btn-primary">Return To Lorry Owners</button>
               <button
                 type="button"
                 onClick={() => {
@@ -165,7 +165,7 @@ export default function CreateDriver() {
                 }}
                 className="btn-secondary"
               >
-                Create Another Driver
+                Create Another Lorry Owner
               </button>
             </div>
           </div>
@@ -174,9 +174,9 @@ export default function CreateDriver() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">What happens next</p>
             <div className="mt-4 space-y-4">
               {[
-                ['Send login details', 'The driver uses email and temporary password to sign in.'],
+                ['Send login details', 'The lorry owner uses email and temporary password to sign in.'],
                 ['Complete profile setup', 'Aadhaar and licence info help operations verify readiness faster.'],
-                ['Assign a truck', 'If you skipped assignment now, the driver can be mapped later from fleet ops.'],
+                ['Assign a truck', 'If you skipped assignment now, the lorry owner can be mapped later from fleet ops.'],
               ].map(([title, copy]) => (
                 <div key={title} className="rounded-2xl border border-neutral-100 bg-neutral-50 p-4">
                   <p className="font-medium text-secondary">{title}</p>
@@ -194,7 +194,7 @@ export default function CreateDriver() {
                 <UserPlus size={22} />
               </div>
               <div>
-                <h2 className="font-poppins text-xl font-semibold text-secondary">Driver Information</h2>
+                <h2 className="font-poppins text-xl font-semibold text-secondary">Lorry Owner Information</h2>
                 <p className="text-sm text-neutral-500">Capture contact, compliance, and fleet ownership in one place.</p>
               </div>
             </div>
@@ -205,7 +205,7 @@ export default function CreateDriver() {
                   <label className="form-label">Broker *</label>
                   <BrokerPicker value={form.brokerId} onChange={(id) => { setField('brokerId', id); setField('truckId', ''); }} />
                   {errors.brokerId && <p className="mt-1 text-xs text-danger">{errors.brokerId}</p>}
-                  <p className="mt-1 text-[11px] text-neutral-400">The driver will be added to this broker&apos;s fleet.</p>
+                  <p className="mt-1 text-[11px] text-neutral-400">The lorry owner will be added to this broker&apos;s fleet.</p>
                 </div>
               </div>
 
@@ -274,7 +274,7 @@ export default function CreateDriver() {
               <div className="flex flex-wrap justify-end gap-3 border-t border-neutral-100 pt-6">
                 <button type="button" onClick={() => navigate('/drivers')} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={registering} className="btn-primary disabled:opacity-60">
-                  {registering ? 'Creating Driver...' : 'Create Driver'}
+                  {registering ? 'Creating Lorry Owner...' : 'Create Lorry Owner'}
                 </button>
               </div>
             </div>
@@ -284,12 +284,12 @@ export default function CreateDriver() {
             <div className="card overflow-hidden">
               <div className="border-b border-neutral-100 bg-[linear-gradient(135deg,#eff6ff_0%,#ecfdf5_100%)] px-6 py-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70">Operational checklist</p>
-                <h3 className="mt-2 font-poppins text-lg font-semibold text-secondary">Build a complete driver record from the start.</h3>
+                <h3 className="mt-2 font-poppins text-lg font-semibold text-secondary">Build a complete lorry owner record from the start.</h3>
               </div>
               <div className="space-y-4 p-6">
                 {[
                   [Phone, 'Primary contact', 'Use the active phone number the operations team reaches on trip day.'],
-                  [Mail, 'Login identity', 'Email becomes the sign-in credential for the driver app.'],
+                  [Mail, 'Login identity', 'Email becomes the sign-in credential for the lorry owner app.'],
                   [Truck, 'Truck assignment', 'Optional during onboarding, useful when the fleet is already fixed.'],
                 ].map(([Icon, title, copy]) => (
                   <div key={title} className="flex gap-3">
@@ -310,7 +310,7 @@ export default function CreateDriver() {
               <div className="mt-4 space-y-3">
                 {[
                   'Broker is selected correctly.',
-                  'Phone and email belong to the actual driver.',
+                  'Phone and email belong to the actual lorry owner.',
                   'Licence expiry is not already in the past.',
                   'Aadhaar is complete if you choose to enter it.',
                 ].map((item) => (

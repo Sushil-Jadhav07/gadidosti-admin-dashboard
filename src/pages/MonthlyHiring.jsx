@@ -85,7 +85,7 @@ export default function MonthlyHiring() {
         </span>
         <div>
           <h1 className="text-2xl font-poppins font-bold text-secondary">Monthly Hiring</h1>
-          <p className="text-sm text-neutral-500 mt-1">Client enquiries and driver/broker vehicle listings for monthly hire.</p>
+          <p className="text-sm text-neutral-500 mt-1">Client enquiries and lorry owner/broker vehicle listings for monthly hire.</p>
         </div>
       </div>
 

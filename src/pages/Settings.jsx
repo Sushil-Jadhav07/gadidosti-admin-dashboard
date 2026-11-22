@@ -579,9 +579,9 @@ export default function Settings() {
                 <div className="bg-primary/5 border border-primary/15 rounded-2xl p-4">
                   <p className="text-xs font-bold text-primary mb-1.5">How commission is calculated</p>
                   <p className="text-xs text-neutral-600 leading-relaxed">
-                    Platform fee is deducted before the remaining amount is paid to the broker/driver.
+                    Platform fee is deducted before the remaining amount is paid to the broker/lorry owner.
                     At <span className="font-semibold">{settings.commissionRate}%</span>, a ₹10,000 booking yields{" "}
-                    <span className="font-semibold text-tertiary">₹{(10000 * (1 - settings.commissionRate / 100)).toLocaleString("en-IN")}</span> to the driver.
+                    <span className="font-semibold text-tertiary">₹{(10000 * (1 - settings.commissionRate / 100)).toLocaleString("en-IN")}</span> to the lorry owner.
                   </p>
                 </div>
 
@@ -601,8 +601,8 @@ export default function Settings() {
               </div>
               <div className="p-6 space-y-5">
                 <p className="text-xs text-neutral-500">
-                  A platform-wide UPI ID drivers can show instead of their own personal one at
-                  collection time — the driver picks which QR to display for each collection, on
+                  A platform-wide UPI ID lorry owners can show instead of their own personal one at
+                  collection time — the lorry owner picks which QR to display for each collection, on
                   their own Payments step.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -102,7 +102,7 @@ export default function Incidents() {
     <div className="space-y-4 animate-fade-in">
       <div>
         <h1 className="text-2xl font-poppins font-bold text-secondary">Incidents</h1>
-        <p className="text-sm text-neutral-500 mt-1">Open trip incidents reported by drivers, platform-wide</p>
+        <p className="text-sm text-neutral-500 mt-1">Open trip incidents reported by lorry owners, platform-wide</p>
       </div>
 
       {error && (
@@ -124,7 +124,7 @@ export default function Incidents() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
-                placeholder="Search by booking, driver, broker, reason..."
+                placeholder="Search by booking, lorry owner, broker, reason..."
                 value={searchTerm}
                 onChange={(event) => { setSearchTerm(event.target.value); setCurrentPage(1); }}
                 className="form-input pl-9 !py-2"
@@ -139,7 +139,7 @@ export default function Incidents() {
                   <th>Booking</th>
                   <th>Reason</th>
                   <th>Notes</th>
-                  <th>Driver</th>
+                  <th>Lorry Owner</th>
                   <th>Broker</th>
                   <th>Reported</th>
                   <th>Status</th>
@@ -209,7 +209,7 @@ export default function Incidents() {
             </div>
             <div className="bg-neutral-50 rounded-lg p-4 space-y-3 text-sm">
               <div><span className="text-neutral-500">Notes</span><p className="mt-1 text-neutral-700">{selectedIncident.notes || 'No additional notes provided.'}</p></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Driver</span><span className="font-medium">{selectedIncident.driverName || '—'}{selectedIncident.driverPhone && <a href={`tel:${selectedIncident.driverPhone}`} className="ml-2 text-primary hover:underline">{selectedIncident.driverPhone}</a>}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-500">Lorry Owner</span><span className="font-medium">{selectedIncident.driverName || '—'}{selectedIncident.driverPhone && <a href={`tel:${selectedIncident.driverPhone}`} className="ml-2 text-primary hover:underline">{selectedIncident.driverPhone}</a>}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Broker</span><span className="font-medium">{selectedIncident.brokerName || '—'}{selectedIncident.brokerPhone && <a href={`tel:${selectedIncident.brokerPhone}`} className="ml-2 text-primary hover:underline">{selectedIncident.brokerPhone}</a>}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Reported At</span><span className="font-medium">{new Date(selectedIncident.reportedAt).toLocaleString('en-IN')}</span></div>
               <div className="flex justify-between"><span className="text-neutral-500">Status</span><Badge status={STATUS_LABELS[selectedIncident.status] || selectedIncident.status} /></div>

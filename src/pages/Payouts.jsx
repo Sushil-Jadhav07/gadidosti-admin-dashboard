@@ -8,7 +8,7 @@ function Spinner({ className = "w-4 h-4 border-2 border-white/30 border-t-white"
 }
 
 const ROLE_META = {
-  driver: { label: "Driver", className: "bg-primary/10 text-primary" },
+  driver: { label: "Lorry Owner", className: "bg-primary/10 text-primary" },
   broker: { label: "Broker", className: "bg-indigo-50 text-indigo-700" },
 };
 
@@ -142,7 +142,7 @@ export default function Payouts() {
       <div>
         <h1 className="text-2xl font-poppins font-bold text-secondary">Payouts</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Driver/broker earnings, commission rates, and manual payout logging.
+          Lorry owner/broker earnings, commission rates, and manual payout logging.
         </p>
       </div>
 
@@ -182,9 +182,9 @@ export default function Payouts() {
               <button
                 key={r}
                 onClick={() => setRoleFilter(r)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all capitalize ${roleFilter === r ? "bg-white text-primary shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${roleFilter === r ? "bg-white text-primary shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
               >
-                {r === "all" ? "All" : `${r}s`}
+                {r === "all" ? "All" : r === "driver" ? "Lorry Owners" : "Brokers"}
               </button>
             ))}
           </div>
@@ -219,7 +219,7 @@ export default function Payouts() {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-10 text-neutral-400 text-sm">No drivers/brokers found</td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-neutral-400 text-sm">No lorry owners/brokers found</td></tr>
                 ) : filtered.map((c) => (
                   <tr key={c.id}>
                     <td className="font-medium whitespace-nowrap">{c.name}</td>

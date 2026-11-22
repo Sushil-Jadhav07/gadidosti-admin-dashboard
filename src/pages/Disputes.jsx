@@ -235,7 +235,7 @@ export default function Disputes() {
                   <div className="flex justify-between"><span className="text-neutral-500">Broker{selectedDispute.brokerName ? ` (${selectedDispute.brokerName})` : ''}</span><a href={`tel:${selectedDispute.brokerPhone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.brokerPhone}</a></div>
                 )}
                 {selectedDispute.driverPhone && (
-                  <div className="flex justify-between"><span className="text-neutral-500">Driver{selectedDispute.driverName ? ` (${selectedDispute.driverName})` : ''}</span><a href={`tel:${selectedDispute.driverPhone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.driverPhone}</a></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Lorry Owner{selectedDispute.driverName ? ` (${selectedDispute.driverName})` : ''}</span><a href={`tel:${selectedDispute.driverPhone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDispute.driverPhone}</a></div>
                 )}
               </div>
             )}

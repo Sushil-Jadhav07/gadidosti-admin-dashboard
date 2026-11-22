@@ -261,7 +261,7 @@ export default function KYC() {
     <div className="space-y-4 animate-fade-in">
       <div>
         <h1 className="text-2xl font-poppins font-bold text-secondary">KYC Verification</h1>
-        <p className="text-sm text-neutral-500 mt-1">Review and approve KYC documents for brokers and drivers</p>
+        <p className="text-sm text-neutral-500 mt-1">Review and approve KYC documents for brokers and lorry owners</p>
       </div>
 
       {error && (
@@ -289,7 +289,7 @@ export default function KYC() {
                 onClick={() => { setActiveTab('drivers'); setCurrentPage(1); setSearchTerm(''); }}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'drivers' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
               >
-                Drivers ({driverData.length})
+                Lorry Owners ({driverData.length})
               </button>
               <button
                 onClick={() => { setActiveTab('clients'); setCurrentPage(1); setSearchTerm(''); }}
@@ -311,7 +311,7 @@ export default function KYC() {
           </div>
 
           <div className="px-5 pb-2">
-            <h3 className="text-base font-poppins font-semibold text-secondary">{activeTab === 'brokers' ? 'Broker KYC' : activeTab === 'drivers' ? 'Driver KYC' : 'Client KYC'}</h3>
+            <h3 className="text-base font-poppins font-semibold text-secondary">{activeTab === 'brokers' ? 'Broker KYC' : activeTab === 'drivers' ? 'Lorry Owner KYC' : 'Client KYC'}</h3>
           </div>
 
           <div className="overflow-x-auto mt-3">
@@ -423,7 +423,7 @@ export default function KYC() {
         </div>
       )}
 
-      <Modal isOpen={!!selectedKYC} onClose={() => { setSelectedKYC(null); setShowRejectBox(false); setRejectReason(''); }} title={`${activeTab === 'brokers' ? 'Broker' : activeTab === 'drivers' ? 'Driver' : 'Client'} KYC Details`} size="lg">
+      <Modal isOpen={!!selectedKYC} onClose={() => { setSelectedKYC(null); setShowRejectBox(false); setRejectReason(''); }} title={`${activeTab === 'brokers' ? 'Broker' : activeTab === 'drivers' ? 'Lorry Owner' : 'Client'} KYC Details`} size="lg">
         {selectedKYC && (
           <div className="space-y-5">
             <div className="flex items-center gap-3">

@@ -15,8 +15,8 @@ const sections = [
     label: 'Operations',
     items: [
       { path: '/bookings', label: 'Bookings', icon: ClipboardList, pageKey: 'bookings' },
-      { path: '/assign-bookings', label: 'Assign Bookings', subLabel: 'Needs a driver', icon: Send, pageKey: 'bookings' },
-      { path: '/drivers', label: 'Drivers', icon: CarFront, pageKey: 'drivers' },
+      { path: '/assign-bookings', label: 'Assign Bookings', subLabel: 'Needs a lorry owner', icon: Send, pageKey: 'bookings' },
+      { path: '/drivers', label: 'Lorry Owners', icon: CarFront, pageKey: 'drivers' },
       { path: '/trucks', label: 'Trucks', icon: Truck, pageKey: 'trucks' },
       { path: '/tracking', label: 'Live Tracking', icon: Radar, pageKey: 'tracking' },
       { path: '/chats', label: 'Chats', subLabel: 'Trip conversations', icon: MessageCircle, pageKey: 'chats' },
@@ -50,7 +50,7 @@ const sections = [
     // of screen even though they're backed by different tables.
     label: 'Issues & Disputes',
     items: [
-      { path: '/incidents', label: 'Incidents', subLabel: 'Reported by drivers', icon: AlertTriangle, pageKey: 'incidents' },
+      { path: '/incidents', label: 'Incidents', subLabel: 'Reported by lorry owners', icon: AlertTriangle, pageKey: 'incidents' },
       { path: '/disputes', label: 'Disputes', subLabel: 'Raised by broker/client', icon: Flag, pageKey: 'disputes' },
     ],
   },

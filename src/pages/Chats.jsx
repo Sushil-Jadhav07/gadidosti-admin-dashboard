@@ -49,7 +49,7 @@ export default function Chats() {
     <div className="space-y-4 animate-fade-in">
       <div>
         <h1 className="text-2xl font-poppins font-bold text-secondary">Chats</h1>
-        <p className="text-sm text-neutral-500 mt-1">Every trip's client/broker/driver conversation, platform-wide</p>
+        <p className="text-sm text-neutral-500 mt-1">Every trip's client/broker/lorry owner conversation, platform-wide</p>
       </div>
 
       {error && (
@@ -64,7 +64,7 @@ export default function Chats() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
-            placeholder="Search by booking, client, broker, driver..."
+            placeholder="Search by booking, client, broker, lorry owner..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             className="form-input pl-9 !py-2"

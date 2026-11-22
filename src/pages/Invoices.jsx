@@ -126,7 +126,7 @@ export default function Invoices() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
-            placeholder="Search by booking ID, client, broker, driver..."
+            placeholder="Search by booking ID, client, broker, lorry owner..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             className="form-input pl-9"
@@ -153,7 +153,7 @@ export default function Invoices() {
                 <tr>
                   <th>Booking ID</th>
                   <th>Client</th>
-                  <th>Broker / Driver</th>
+                  <th>Broker / Lorry Owner</th>
                   <th>Route</th>
                   <th className="text-right">Amount</th>
                   <th>Payment / Invoice</th>
@@ -168,7 +168,7 @@ export default function Invoices() {
                     <td>{booking.client || '-'}</td>
                     <td className="whitespace-nowrap">
                       <div className="text-neutral-700">{booking.broker || '—'}</div>
-                      <div className="text-xs text-neutral-400 mt-0.5">{booking.driver?.name || 'No driver assigned'}</div>
+                      <div className="text-xs text-neutral-400 mt-0.5">{booking.driver?.name || 'No lorry owner assigned'}</div>
                     </td>
                     <td className="max-w-[220px] truncate" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>
                     <td className="text-right font-medium whitespace-nowrap">{money(booking.amount)}</td>

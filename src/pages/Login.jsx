@@ -5,7 +5,7 @@ import { api } from '../services/api';
 const FEATURES = [
   { icon: Radar, label: 'Live GPS tracking for every truck on the road' },
   { icon: ClipboardList, label: 'End-to-end booking management' },
-  { icon: Truck, label: 'Fleet, driver & broker oversight in one place' },
+  { icon: Truck, label: 'Fleet, lorry owner & broker oversight in one place' },
   { icon: ShieldCheck, label: 'Built-in KYC & compliance workflows' },
 ];
 
@@ -58,7 +58,7 @@ export default function Login({ onLogin }) {
             Run your logistics operations from one place.
           </h1>
           <p className="text-white/60 text-sm mt-3">
-            Bookings, fleet, drivers and disputes — everything your team needs to keep shipments moving.
+            Bookings, fleet, lorry owners and disputes — everything your team needs to keep shipments moving.
           </p>
 
           <div className="mt-9 space-y-4">

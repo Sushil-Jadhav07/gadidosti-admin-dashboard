@@ -69,7 +69,7 @@ export default function ChatThreadList({
               {!compact && <p className="text-xs text-neutral-500 mt-1 truncate sm:hidden">{t.pickup} → {t.drop}</p>}
 
               <p className="text-xs text-neutral-500 mt-1 truncate">
-                {[t.clientName && `Client: ${t.clientName}`, t.brokerName && `Broker: ${t.brokerName}`, t.driverName && `Driver: ${t.driverName}`]
+                {[t.clientName && `Client: ${t.clientName}`, t.brokerName && `Broker: ${t.brokerName}`, t.driverName && `Lorry Owner: ${t.driverName}`]
                   .filter(Boolean)
                   .join(' · ') || 'No participants assigned yet'}
               </p>

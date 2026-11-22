@@ -269,7 +269,7 @@ export default function Trucks() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
-              placeholder="Search by registration, driver, broker..."
+              placeholder="Search by registration, lorry owner, broker..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="form-input pl-9"
@@ -350,7 +350,7 @@ export default function Trucks() {
 
                   <div className="space-y-2 text-sm border-t border-neutral-100 pt-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-neutral-400">Driver</span>
+                      <span className="text-xs text-neutral-400">Lorry Owner</span>
                       {truck.driver !== '—' ? (
                         <span className="flex items-center gap-2 min-w-0">
                           <Avatar name={truck.driver} size={22} />
@@ -388,7 +388,7 @@ export default function Trucks() {
                       <th>Registration No.</th>
                       <th>Type</th>
                       <th>Make / Year</th>
-                      <th>Driver Assigned</th>
+                      <th>Lorry Owner Assigned</th>
                       <th>Last Trip</th>
                       <th>Insurance Expiry</th>
                       <th>Capacity</th>
@@ -467,7 +467,7 @@ export default function Trucks() {
               <span className="text-neutral-500">Broker</span><span className="font-medium">{selectedTruck.broker}</span>
             </div>
             <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
-              <span className="text-neutral-500">Driver</span><span className="font-medium">{selectedTruck.driver}</span>
+              <span className="text-neutral-500">Lorry Owner</span><span className="font-medium">{selectedTruck.driver}</span>
             </div>
             <div className="bg-neutral-50 rounded-lg p-3 flex justify-between text-sm">
               <span className="text-neutral-500">Truck Structure</span>

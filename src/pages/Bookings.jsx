@@ -153,7 +153,7 @@ export function DeletedBadge({ deletedAt, className = '' }) {
   const date = new Date(deletedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 ${className}`}>
-      <Undo2 size={11} /> Removed by broker/driver on {date} — still recoverable, hard-delete to remove permanently
+      <Undo2 size={11} /> Removed by broker/lorry owner on {date} — still recoverable, hard-delete to remove permanently
     </span>
   );
 }
@@ -161,7 +161,7 @@ export function DeletedBadge({ deletedAt, className = '' }) {
 const CASCADE_ITEMS = [
   'The booking timeline',
   'Job requests',
-  'Driver requests',
+  'Lorry owner requests',
   'The trip record',
   'Chat thread and messages',
   'Any payment, dispute, and settlement rows tied to it',
@@ -434,7 +434,7 @@ export default function Bookings() {
 
   const handleExport = () => {
     const rows = selectedIds.size > 0 ? filteredBookings.filter((b) => selectedIds.has(b.id)) : filteredBookings;
-    const header = ['Booking ID', 'Client', 'Truck Type', 'Broker', 'Driver', 'Pickup', 'Drop', 'Status', 'Amount', 'Date'];
+    const header = ['Booking ID', 'Client', 'Truck Type', 'Broker', 'Lorry Owner', 'Pickup', 'Drop', 'Status', 'Amount', 'Date'];
     const lines = [header, ...rows.map((b) => [
       bookingRef(b), b.client || '', b.truckType || b.truckCategory || '', b.broker || '', b.driver?.name || '',
       b.pickup || '', b.drop || '', STATUS_MAP[b.status] || b.status || '', b.amount || 0,
@@ -632,7 +632,7 @@ export default function Bookings() {
                 </th>
                 <th>Booking</th>
                 <th>Customer</th>
-                <th>Broker / Driver</th>
+                <th>Broker / Lorry Owner</th>
                 <th>Route</th>
                 <th>Date</th>
                 <th>Fee</th>
@@ -669,7 +669,7 @@ export default function Bookings() {
                       <span className="text-neutral-700">{booking.broker || '—'}</span>
                     </div>
                     <div className="mt-0.5 text-xs text-neutral-400">
-                      {booking.driver?.name || 'No driver assigned'}
+                      {booking.driver?.name || 'No lorry owner assigned'}
                     </div>
                   </td>
                   <td className="max-w-[200px] truncate text-neutral-500" title={`${booking.pickup} → ${booking.drop}`}>{booking.pickup} → {booking.drop}</td>

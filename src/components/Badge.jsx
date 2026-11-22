@@ -14,7 +14,7 @@ const statusConfig = {
   'Blocked':         'bg-red-50 text-red-700 border-red-200',
   'Client':          'bg-blue-50 text-blue-700 border-blue-200',
   'Broker':          'bg-primary/10 text-primary border-primary/20',
-  'Driver':          'bg-amber-50 text-amber-700 border-amber-200',
+  'Lorry Owner':     'bg-amber-50 text-amber-700 border-amber-200',
   'Admin':           'bg-secondary/10 text-secondary border-secondary/20',
   'Available':       'bg-green-50 text-green-700 border-green-200',
   'Offline':         'bg-neutral-100 text-neutral-500 border-neutral-200',

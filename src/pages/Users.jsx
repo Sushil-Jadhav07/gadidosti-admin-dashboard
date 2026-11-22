@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 import { PAGE_KEYS } from '../utils/permissions';
+import { roleLabel } from '../utils/roleLabel';
 
 const KYC_LABEL = {
   pending: 'Pending',
@@ -308,7 +309,7 @@ export default function Users() {
       }, getToken());
       if (!data.success) throw new Error(data.message || 'Failed to create user');
       setShowAddUser(false);
-      showToast(`${cap(addForm.role)} account created successfully`);
+      showToast(`${roleLabel(addForm.role)} account created successfully`);
       fetchUsers(page, search, roleFilter, statusFilter, kycFilter);
     } catch (err) {
       setAddError(err.message || 'Network error — could not create user');
@@ -422,7 +423,7 @@ export default function Users() {
                 className="form-select !py-2 pl-3 pr-8"
               >
                 <option value="">All Roles</option>
-                {ROLES.slice(1).map((r) => <option key={r} value={r}>{cap(r)}</option>)}
+                {ROLES.slice(1).map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
             </div>
@@ -517,7 +518,7 @@ export default function Users() {
                     </div>
                   </td>
                   <td className="whitespace-nowrap text-sm">{user.phone || '—'}</td>
-                  <td><Badge status={cap(user.role)} /></td>
+                  <td><Badge status={roleLabel(user.role)} /></td>
                   <td><Badge status={cap(user.status)} /></td>
                   <td>{['broker', 'driver'].includes(user.role) ? <KycBadge status={user.kyc_status} /> : <span className="text-neutral-300">—</span>}</td>
                   <td className="text-sm text-neutral-600 whitespace-nowrap">{fmt(user.created_at)}</td>
@@ -615,7 +616,7 @@ export default function Users() {
               <div>
                 <h3 className="text-lg font-semibold text-secondary">{selectedUser.name}</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge status={cap(selectedUser.role)} />
+                  <Badge status={roleLabel(selectedUser.role)} />
                   <Badge status={cap(selectedUser.status)} />
                 </div>
               </div>

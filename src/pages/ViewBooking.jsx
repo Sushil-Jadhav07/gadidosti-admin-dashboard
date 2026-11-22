@@ -202,7 +202,7 @@ function ManageTripSection({ booking, onToast, onChanged }) {
           <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
             <Wrench size={15} />
           </div>
-          <span className="text-sm font-poppins font-semibold text-secondary">Manage Trip · Driver Unreachable</span>
+          <span className="text-sm font-poppins font-semibold text-secondary">Manage Trip · Lorry Owner Unreachable</span>
         </span>
         {open ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
       </button>
@@ -210,8 +210,8 @@ function ManageTripSection({ booking, onToast, onChanged }) {
       {open && (
         <div className="p-4 border-t border-amber-200 space-y-4">
           <p className="text-xs text-neutral-500">
-            Only use this to move the trip forward on the driver's behalf if they're stuck or unreachable
-            (dead phone, crashed app, etc.). Every action below overrides the driver's own app.
+            Only use this to move the trip forward on the lorry owner's behalf if they're stuck or unreachable
+            (dead phone, crashed app, etc.). Every action below overrides the lorry owner's own app.
           </p>
 
           {loading && <div className="text-sm text-neutral-400">Loading trip...</div>}
@@ -293,7 +293,7 @@ function ManageTripSection({ booking, onToast, onChanged }) {
           <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
             <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800 font-medium">
-              This overrides the driver's own status update — only use this if the driver can't act themselves.
+              This overrides the lorry owner's own status update — only use this if the lorry owner can't act themselves.
             </p>
           </div>
           <p className="text-sm text-neutral-600">
@@ -333,10 +333,10 @@ function AssignDriverSection({ booking, onToast, onChanged }) {
         // than silently dropping them from the list — the backend's own 409 explains it if picked.
         setDrivers(res.data?.drivers || []);
       } else {
-        onToast({ message: res.message || 'Failed to load drivers.', type: 'error' });
+        onToast({ message: res.message || 'Failed to load lorry owners.', type: 'error' });
       }
     } catch {
-      onToast({ message: 'Network error — could not load drivers.', type: 'error' });
+      onToast({ message: 'Network error — could not load lorry owners.', type: 'error' });
     } finally {
       setLoadingDrivers(false);
     }
@@ -354,15 +354,15 @@ function AssignDriverSection({ booking, onToast, onChanged }) {
     try {
       const res = await api.post(`/api/admin/bookings/${booking.id}/assign-driver`, { driver_id: selectedDriverId }, getToken());
       if (res.success) {
-        onToast({ message: 'Request sent to driver — awaiting their response.', type: 'success' });
+        onToast({ message: 'Request sent to lorry owner — awaiting their response.', type: 'success' });
         setSelectedDriverId('');
         setOpen(false);
         onChanged();
       } else {
-        onToast({ message: res.message || 'Failed to assign driver.', type: 'error' });
+        onToast({ message: res.message || 'Failed to assign lorry owner.', type: 'error' });
       }
     } catch {
-      onToast({ message: 'Network error — could not assign driver.', type: 'error' });
+      onToast({ message: 'Network error — could not assign lorry owner.', type: 'error' });
     } finally {
       setAssigning(false);
     }
@@ -379,7 +379,7 @@ function AssignDriverSection({ booking, onToast, onChanged }) {
           <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
             <Truck size={15} />
           </div>
-          <span className="text-sm font-poppins font-semibold text-secondary">Assign Driver (Admin)</span>
+          <span className="text-sm font-poppins font-semibold text-secondary">Assign Lorry Owner (Admin)</span>
         </span>
         {open ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
       </button>
@@ -387,21 +387,21 @@ function AssignDriverSection({ booking, onToast, onChanged }) {
       {open && (
         <div className="p-4 border-t border-primary/20 space-y-3">
           <p className="text-xs text-neutral-500">
-            Pick any driver in the system, regardless of distance from pickup. This sends them a
+            Pick any lorry owner in the system, regardless of distance from pickup. This sends them a
             request at the booking's current price — they can accept or decline, but not
             negotiate, since the price is already fixed once you assign it.
           </p>
           <input
             type="text"
-            placeholder="Search by driver name or truck registration..."
+            placeholder="Search by lorry owner name or truck registration..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="form-input w-full"
           />
           {loadingDrivers ? (
-            <div className="text-sm text-neutral-400 py-2">Loading drivers...</div>
+            <div className="text-sm text-neutral-400 py-2">Loading lorry owners...</div>
           ) : filtered.length === 0 ? (
-            <div className="text-sm text-neutral-400 py-2">No available drivers found.</div>
+            <div className="text-sm text-neutral-400 py-2">No available lorry owners found.</div>
           ) : (
             <div className="max-h-56 overflow-y-auto space-y-1.5 border border-neutral-100 rounded-xl p-2">
               {filtered.map((d) => (
@@ -426,7 +426,7 @@ function AssignDriverSection({ booking, onToast, onChanged }) {
             disabled={!selectedDriverId || assigning}
             className="btn-primary w-full !py-2.5 text-sm disabled:opacity-50"
           >
-            {assigning ? 'Sending request...' : 'Send Request to Selected Driver'}
+            {assigning ? 'Sending request...' : 'Send Request to Selected Lorry Owner'}
           </button>
         </div>
       )}
@@ -631,8 +631,8 @@ export default function ViewBooking() {
             rows={[
               ['Broker', booking.broker],
               ['Broker Phone', <PhoneLink phone={booking.brokerPhone} />],
-              ['Driver', booking.driver?.name],
-              ['Driver Phone', <PhoneLink phone={booking.driverPhone || booking.driver?.phone} />],
+              ['Lorry Owner', booking.driver?.name],
+              ['Lorry Owner Phone', <PhoneLink phone={booking.driverPhone || booking.driver?.phone} />],
               ['Truck Reg.', booking.truckReg],
             ]}
           />
@@ -670,7 +670,7 @@ export default function ViewBooking() {
                 <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Client approved</span>
               )}
               {booking.podStatus === 'rejected' && (
-                <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Client rejected — driver re-uploading</span>
+                <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Client rejected — lorry owner re-uploading</span>
               )}
             </p>
             <PodGallery media={booking.podMedia} token={getToken()} />

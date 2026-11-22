@@ -94,10 +94,10 @@ export default function Drivers() {
       if (driversRes.success) {
         setDrivers(driversRes.data.drivers.map(mapDriver));
       } else {
-        setError(driversRes.message || 'Failed to load drivers');
+        setError(driversRes.message || 'Failed to load lorry owners');
       }
     } catch {
-      setError('Network error — could not load drivers');
+      setError('Network error — could not load lorry owners');
     } finally {
       setLoading(false);
     }
@@ -138,12 +138,12 @@ export default function Drivers() {
         aadhaar: editForm.aadhaar || undefined,
         status: editForm.status || undefined,
       }, getToken());
-      if (!res.success) throw new Error(res.message || 'Failed to update driver');
+      if (!res.success) throw new Error(res.message || 'Failed to update lorry owner');
       await fetchDrivers();
       setEditTarget(null);
-      setToast({ message: 'Driver updated successfully', type: 'success' });
+      setToast({ message: 'Lorry owner updated successfully', type: 'success' });
     } catch (err) {
-      setEditError(err.message || 'Network error — could not update driver');
+      setEditError(err.message || 'Network error — could not update lorry owner');
     } finally {
       setSavingEdit(false);
     }
@@ -154,13 +154,13 @@ export default function Drivers() {
     setDeleting(true);
     try {
       const res = await api.delete(`/api/vehicles/drivers/${deleteTarget.id}`, getToken());
-      if (!res.success) throw new Error(res.message || 'Failed to delete driver');
+      if (!res.success) throw new Error(res.message || 'Failed to delete lorry owner');
       setDrivers((prev) => prev.filter((d) => d.id !== deleteTarget.id));
       if (selectedDriver?.id === deleteTarget.id) setSelectedDriver(null);
       setDeleteTarget(null);
-      setToast({ message: 'Driver deleted successfully', type: 'success' });
+      setToast({ message: 'Lorry owner deleted successfully', type: 'success' });
     } catch (err) {
-      setToast({ message: err.message || 'Network error — could not delete driver', type: 'error' });
+      setToast({ message: err.message || 'Network error — could not delete lorry owner', type: 'error' });
     } finally {
       setDeleting(false);
     }
@@ -212,10 +212,10 @@ export default function Drivers() {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-poppins font-bold text-secondary">Drivers</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage drivers and monitor their availability</p>
+          <h1 className="text-2xl font-poppins font-bold text-secondary">Lorry Owners</h1>
+          <p className="text-sm text-neutral-500 mt-1">Manage lorry owners and monitor their availability</p>
         </div>
-        <button onClick={() => navigate('/drivers/create')} className="btn-primary flex-shrink-0"><Plus size={16} /> Add New Driver</button>
+        <button onClick={() => navigate('/drivers/create')} className="btn-primary flex-shrink-0"><Plus size={16} /> Add New Lorry Owner</button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
@@ -239,7 +239,7 @@ export default function Drivers() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                   type="text"
-                  placeholder="Search driver..."
+                  placeholder="Search lorry owner..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="form-input pl-9"
@@ -282,7 +282,7 @@ export default function Drivers() {
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {paginated.length === 0 ? (
-                    <div className="card p-12 text-center text-neutral-400 sm:col-span-2 xl:col-span-3">No drivers found matching your filters.</div>
+                    <div className="card p-12 text-center text-neutral-400 sm:col-span-2 xl:col-span-3">No lorry owners found matching your filters.</div>
                   ) : paginated.map((driver) => (
                     <button
                       key={driver.id}
@@ -320,7 +320,7 @@ export default function Drivers() {
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Driver ID</th>
+                          <th>Lorry Owner ID</th>
                           <th>Name</th>
                           <th>Phone</th>
                           <th>License No. / Expiry</th>
@@ -332,7 +332,7 @@ export default function Drivers() {
                       </thead>
                       <tbody>
                         {paginated.length === 0 ? (
-                          <tr><td colSpan={8} className="text-center py-12 text-neutral-400">No drivers found matching your filters.</td></tr>
+                          <tr><td colSpan={8} className="text-center py-12 text-neutral-400">No lorry owners found matching your filters.</td></tr>
                         ) : paginated.map((driver) => (
                           <tr
                             key={driver.id}
@@ -399,13 +399,13 @@ export default function Drivers() {
 
         <div className="card p-5 lg:sticky lg:top-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-poppins font-semibold text-secondary">Driver Details</h3>
+            <h3 className="text-base font-poppins font-semibold text-secondary">Lorry Owner Details</h3>
             <button type="button" aria-label="More options" className="text-neutral-400 hover:text-neutral-600 transition-colors">
               <MoreVertical size={18} />
             </button>
           </div>
           {!selectedDriver ? (
-            <p className="text-sm text-neutral-400 text-center py-10">Select a driver to see their details.</p>
+            <p className="text-sm text-neutral-400 text-center py-10">Select a lorry owner to see their details.</p>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -419,7 +419,7 @@ export default function Drivers() {
                 </div>
               </div>
               <div className="bg-neutral-50 rounded-xl p-4 space-y-3 text-sm">
-                <div className="flex justify-between"><span className="text-neutral-500">Driver ID</span><span className="font-medium">{shortId(selectedDriver.id)}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-500">Lorry Owner ID</span><span className="font-medium">{shortId(selectedDriver.id)}</span></div>
                 <div className="flex justify-between items-center"><span className="text-neutral-500">Phone</span>{selectedDriver.phone ? <a href={`tel:${selectedDriver.phone}`} className="font-medium text-primary hover:underline flex items-center gap-1"><Phone size={12} />{selectedDriver.phone}</a> : <span className="font-medium">—</span>}</div>
                 <div className="flex justify-between items-center"><span className="text-neutral-500">Email</span>{selectedDriver.email ? <a href={`mailto:${selectedDriver.email}`} className="font-medium text-primary hover:underline flex items-center gap-1 truncate max-w-[65%]"><Mail size={12} className="flex-shrink-0" />{selectedDriver.email}</a> : <span className="font-medium">—</span>}</div>
                 <div className="flex justify-between"><span className="text-neutral-500">License Number</span><span className="font-medium">{selectedDriver.licenseNo}</span></div>
@@ -452,7 +452,7 @@ export default function Drivers() {
         </div>
       </div>
 
-      <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title="Edit Driver" size="sm">
+      <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title="Edit Lorry Owner" size="sm">
         {editTarget && (
           <div className="space-y-4">
             <div className="bg-neutral-50 rounded-xl p-3 flex items-center gap-3">
@@ -498,22 +498,22 @@ export default function Drivers() {
         )}
       </Modal>
 
-      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Driver" size="sm">
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Lorry Owner" size="sm">
         {deleteTarget && (
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
               Are you sure you want to delete <span className="font-semibold text-neutral-800">{deleteTarget.name}</span>?
-              This cannot be undone if they have no booking history — otherwise the driver will need to be removed from active fleet duty instead.
+              This cannot be undone if they have no booking history — otherwise the lorry owner will need to be removed from active fleet duty instead.
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="btn-danger disabled:opacity-50">{deleting ? 'Deleting...' : 'Delete Driver'}</button>
+              <button onClick={handleDelete} disabled={deleting} className="btn-danger disabled:opacity-50">{deleting ? 'Deleting...' : 'Delete Lorry Owner'}</button>
             </div>
           </div>
         )}
       </Modal>
 
-      <Modal isOpen={!!resetTarget} onClose={() => setResetTarget(null)} title="Reset Driver Session" size="sm">
+      <Modal isOpen={!!resetTarget} onClose={() => setResetTarget(null)} title="Reset Lorry Owner Session" size="sm">
         {resetTarget && (
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">

@@ -8,7 +8,7 @@ import { api, getToken } from '../services/api';
 
 const AUDIENCES = [
   { key: 'client', label: 'Client' },
-  { key: 'driver', label: 'Driver' },
+  { key: 'driver', label: 'Lorry Owner' },
   { key: 'broker', label: 'Broker' },
 ];
 
