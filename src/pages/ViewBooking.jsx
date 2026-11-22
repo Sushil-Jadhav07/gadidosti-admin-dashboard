@@ -311,6 +311,128 @@ function ManageTripSection({ booking, onToast, onChanged }) {
   );
 }
 
+// Admin-only — didn't exist before this. Unlike the broker's own driver assignment (scoped to
+// their own fleet) this lets admin pick ANY driver anywhere in the system, no distance
+// restriction, via the new POST /api/admin/bookings/{id}/assign-driver. Only ever shown for a
+// still-'pending' booking (the backend enforces the same, this is just matching UX — no point
+// showing it once a driver's already been assigned or negotiated).
+function AssignDriverSection({ booking, onToast, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const [drivers, setDrivers] = useState([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
+  const fetchDrivers = async () => {
+    setLoadingDrivers(true);
+    try {
+      const res = await api.get('/api/vehicles/drivers?status=available&limit=100', getToken());
+      if (res.success) {
+        // Still show a driver with no truck (so admin can see why they're unassignable) rather
+        // than silently dropping them from the list — the backend's own 409 explains it if picked.
+        setDrivers(res.data?.drivers || []);
+      } else {
+        onToast({ message: res.message || 'Failed to load drivers.', type: 'error' });
+      }
+    } catch {
+      onToast({ message: 'Network error — could not load drivers.', type: 'error' });
+    } finally {
+      setLoadingDrivers(false);
+    }
+  };
+
+  const toggleOpen = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && drivers.length === 0) fetchDrivers();
+  };
+
+  const handleAssign = async () => {
+    if (!selectedDriverId) return;
+    setAssigning(true);
+    try {
+      const res = await api.post(`/api/admin/bookings/${booking.id}/assign-driver`, { driver_id: selectedDriverId }, getToken());
+      if (res.success) {
+        onToast({ message: 'Request sent to driver — awaiting their response.', type: 'success' });
+        setSelectedDriverId('');
+        setOpen(false);
+        onChanged();
+      } else {
+        onToast({ message: res.message || 'Failed to assign driver.', type: 'error' });
+      }
+    } catch {
+      onToast({ message: 'Network error — could not assign driver.', type: 'error' });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const filtered = drivers.filter((d) =>
+    !search || d.name?.toLowerCase().includes(search.toLowerCase()) || d.truckReg?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="border border-primary/20 bg-primary/5 rounded-2xl overflow-hidden">
+      <button onClick={toggleOpen} className="w-full flex items-center justify-between gap-2.5 p-4 hover:bg-primary/10 transition-colors">
+        <span className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+            <Truck size={15} />
+          </div>
+          <span className="text-sm font-poppins font-semibold text-secondary">Assign Driver (Admin)</span>
+        </span>
+        {open ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
+      </button>
+
+      {open && (
+        <div className="p-4 border-t border-primary/20 space-y-3">
+          <p className="text-xs text-neutral-500">
+            Pick any driver in the system, regardless of distance from pickup. This sends them a
+            request — they still need to accept it, same as any other assignment.
+          </p>
+          <input
+            type="text"
+            placeholder="Search by driver name or truck registration..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="form-input w-full"
+          />
+          {loadingDrivers ? (
+            <div className="text-sm text-neutral-400 py-2">Loading drivers...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-sm text-neutral-400 py-2">No available drivers found.</div>
+          ) : (
+            <div className="max-h-56 overflow-y-auto space-y-1.5 border border-neutral-100 rounded-xl p-2">
+              {filtered.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setSelectedDriverId(d.id)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
+                    selectedDriverId === d.id ? 'bg-primary text-white' : 'hover:bg-neutral-50 text-neutral-700'
+                  }`}
+                >
+                  <span className="font-medium">{d.name}</span>
+                  <span className={`text-xs flex-shrink-0 ${selectedDriverId === d.id ? 'text-white/80' : 'text-neutral-400'}`}>
+                    {d.truckReg || 'No truck'} · {d.broker || '—'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={handleAssign}
+            disabled={!selectedDriverId || assigning}
+            className="btn-primary w-full !py-2.5 text-sm disabled:opacity-50"
+          >
+            {assigning ? 'Sending request...' : 'Send Request to Selected Driver'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PricingBreakdown({ pricing, amount }) {
   const base = pricing?.baseFare ?? pricing?.base_fare ?? 0;
   const fuel = pricing?.fuel ?? pricing?.fuelSurcharge ?? 0;
@@ -566,6 +688,10 @@ export default function ViewBooking() {
             </div>
             <span className="text-sm font-medium text-neutral-700">{loadingPod ? 'Loading...' : 'View Proof of Delivery'}</span>
           </button>
+        )}
+
+        {booking.status === 'pending' && (
+          <AssignDriverSection booking={booking} onToast={setToast} onChanged={refreshBooking} />
         )}
 
         {booking.status !== 'completed' && booking.status !== 'cancelled' && (
