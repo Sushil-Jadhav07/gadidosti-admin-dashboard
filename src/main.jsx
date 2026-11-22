@@ -2,6 +2,13 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
+import { registerServiceWorker } from './lib/firebase'
+
+// Registered unconditionally (not gated behind login or notification permission) so the app
+// has an active service worker from first visit — that's what makes Chrome/Edge offer the
+// "Install app" prompt. requestFcmToken() re-registers the same URL later, which is a no-op
+// once this has already run.
+registerServiceWorker()
 
 // No <StrictMode> here — its dev-only double-invoke of effects breaks
 // @react-google-maps/api's <Marker> rendering (confirmed in the broker+driver app:

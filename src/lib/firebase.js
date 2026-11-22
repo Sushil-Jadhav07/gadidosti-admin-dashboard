@@ -34,6 +34,20 @@ function getFirebaseMessaging() {
   return messagingPromise;
 }
 
+// Exported and called unconditionally from main.jsx (not just from requestFcmToken below) -
+// Chrome's install-as-PWA prompt needs an active service worker controlling the page, and that
+// shouldn't depend on whether the admin is logged in or has granted notification permission
+// yet. Registering this same URL again later (inside requestFcmToken) is a no-op that returns
+// the existing registration rather than installing a second worker.
+export async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    return await navigator.serviceWorker.register(backgroundServiceWorkerUrl());
+  } catch {
+    return null;
+  }
+}
+
 // Call right after login, and again whenever a fresh token is needed (there's
 // no onTokenRefresh listener on the web SDK the way there is on
 // Android/iOS - getToken() always returns the current valid registration
@@ -47,7 +61,8 @@ export async function requestFcmToken() {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return null;
 
-  const registration = await navigator.serviceWorker.register(backgroundServiceWorkerUrl());
+  const registration = await registerServiceWorker();
+  if (!registration) return null;
   return getFcmToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
 }
 
