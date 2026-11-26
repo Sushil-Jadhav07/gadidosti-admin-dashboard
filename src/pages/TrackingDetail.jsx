@@ -145,8 +145,8 @@ export default function TrackingDetail() {
   const navigate = useNavigate();
   // gps_owner accounts can see which truck a device is linked to, but the backend now rejects
   // the link-truck call from that role outright (fleet-wide device linking is admin/staff only,
-  // separate from which trucks a gps_owner is allowed to SEE — see Users.jsx's Truck Access
-  // editor) — hide the edit controls rather than showing a button that would just 403.
+  // separate from which devices a gps_owner is allowed to SEE at all — see Users.jsx's Device
+  // Access editor) — hide the edit controls rather than showing a button that would just 403.
   const canLinkTruck = getStoredAuth()?.user?.role !== 'gps_owner';
   const [device, setDevice] = useState(null);
   const [loading, setLoading] = useState(true);

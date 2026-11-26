@@ -89,12 +89,12 @@ export default function Users() {
   const [savingPerm, setSavingPerm] = useState(false);
   const [permError, setPermError] = useState('');
 
-  const [allTrucks, setAllTrucks] = useState([]);
-  const [loadingTrucks, setLoadingTrucks] = useState(false);
-  const [truckSearch, setTruckSearch] = useState('');
-  const [grantedTruckIds, setGrantedTruckIds] = useState([]);
-  const [savingTrucks, setSavingTrucks] = useState(false);
-  const [truckError, setTruckError] = useState('');
+  const [allDevices, setAllDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [deviceSearch, setDeviceSearch] = useState('');
+  const [grantedDeviceImeis, setGrantedDeviceImeis] = useState([]);
+  const [savingDevices, setSavingDevices] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
 
   const [billingType, setBillingType] = useState('prepaid');
   const [creditLimitDraft, setCreditLimitDraft] = useState('50000');
@@ -139,54 +139,55 @@ export default function Users() {
     setPermError('');
   }, [selectedUser?.id, selectedUser?.page_permissions]);
 
-  // Truck Access (gps_owner only) — fetches the full truck list once per opened account (not
-  // reused across different gps_owner accounts in the same session, since the admin might add a
-  // truck in between) and this account's currently-granted subset, to seed the checklist.
+  // Device Access (gps_owner only) — fetches the same device list Live Tracking itself shows
+  // (not derived through trucks at all — a gps_owner can be granted a device regardless of
+  // whether it's ever been linked to one of our truck records) and this account's
+  // currently-granted subset, to seed the checklist. Re-fetched per opened account, not reused
+  // across different gps_owner accounts in the same session, since positions/statuses move.
   useEffect(() => {
     if (selectedUser?.role !== 'gps_owner') return;
-    setTruckError('');
-    setLoadingTrucks(true);
+    setDeviceError('');
+    setLoadingDevices(true);
     (async () => {
       try {
-        const [trucksRes, grantedRes] = await Promise.all([
-          api.get('/api/vehicles/trucks?limit=100', getToken()),
-          api.get(`/api/admin/users/${selectedUser.id}/gps-trucks`, getToken()),
+        const [devicesRes, grantedRes] = await Promise.all([
+          api.get('/api/tracking/devices', getToken()),
+          api.get(`/api/admin/users/${selectedUser.id}/gps-devices`, getToken()),
         ]);
-        if (trucksRes.success) setAllTrucks(trucksRes.data.trucks || []);
-        if (grantedRes.success) setGrantedTruckIds((grantedRes.data.trucks || []).map((t) => t.id));
+        if (devicesRes.success) setAllDevices(devicesRes.data.devices || []);
+        if (grantedRes.success) setGrantedDeviceImeis(grantedRes.data.deviceImeis || []);
       } catch {
-        setTruckError('Network error — could not load trucks');
+        setDeviceError('Network error — could not load devices');
       } finally {
-        setLoadingTrucks(false);
+        setLoadingDevices(false);
       }
     })();
   }, [selectedUser?.id, selectedUser?.role]);
 
-  const toggleGrantedTruck = (id) => {
-    setGrantedTruckIds((current) => (current.includes(id) ? current.filter((t) => t !== id) : [...current, id]));
+  const toggleGrantedDevice = (imei) => {
+    setGrantedDeviceImeis((current) => (current.includes(imei) ? current.filter((i) => i !== imei) : [...current, imei]));
   };
 
-  const handleSaveTruckAccess = async () => {
+  const handleSaveDeviceAccess = async () => {
     if (!selectedUser) return;
-    setSavingTrucks(true);
-    setTruckError('');
+    setSavingDevices(true);
+    setDeviceError('');
     try {
-      const data = await api.patch(`/api/admin/users/${selectedUser.id}/gps-trucks`, { truck_ids: grantedTruckIds }, getToken());
-      if (!data.success) throw new Error(data.message || 'Failed to update truck access');
-      showToast('Truck access updated');
+      const data = await api.patch(`/api/admin/users/${selectedUser.id}/gps-devices`, { device_imeis: grantedDeviceImeis }, getToken());
+      if (!data.success) throw new Error(data.message || 'Failed to update device access');
+      showToast('Device access updated');
     } catch (err) {
-      setTruckError(err.message || 'Failed to update truck access');
+      setDeviceError(err.message || 'Failed to update device access');
     } finally {
-      setSavingTrucks(false);
+      setSavingDevices(false);
     }
   };
 
-  // Only trucks that actually have a GPS device linked (see Live Tracking's Linked Truck card) —
-  // granting a gps_owner a truck with no tracker on it would be a no-op with nothing for them to
-  // ever see, so it's left out of this list entirely rather than shown as a dead-end option.
-  const gpsLinkedTrucks = allTrucks.filter((t) => t.gpsDeviceImei);
-  const filteredTrucks = gpsLinkedTrucks.filter((t) =>
-    !truckSearch || t.registration?.toLowerCase().includes(truckSearch.toLowerCase())
+  const filteredDevices = allDevices.filter((d) =>
+    !deviceSearch ||
+    d.name?.toLowerCase().includes(deviceSearch.toLowerCase()) ||
+    d.deviceImei?.toLowerCase().includes(deviceSearch.toLowerCase()) ||
+    d.truckRegistration?.toLowerCase().includes(deviceSearch.toLowerCase())
   );
 
   // Re-seeds the billing-type form whenever a different client is opened — credit limit drafts
@@ -842,51 +843,49 @@ export default function Users() {
 
             {selectedUser.role === 'gps_owner' && (
               <div className="border-t border-neutral-100 pt-4">
-                <p className="text-xs font-semibold text-neutral-500 mb-2.5">Truck Access</p>
+                <p className="text-xs font-semibold text-neutral-500 mb-2.5">Device Access</p>
                 <p className="text-xs text-neutral-400 mb-3">
-                  Only trucks with a GPS device already linked are listed. Only checked ones are visible to this account on Live Tracking — nothing is granted by default.
+                  The same devices Live Tracking shows — only checked ones are visible to this account. Nothing is granted by default.
                 </p>
                 <input
                   type="text"
-                  value={truckSearch}
-                  onChange={(e) => setTruckSearch(e.target.value)}
-                  placeholder="Search by registration..."
+                  value={deviceSearch}
+                  onChange={(e) => setDeviceSearch(e.target.value)}
+                  placeholder="Search by name, IMEI or truck..."
                   className="form-input text-sm mb-2.5"
                 />
-                {loadingTrucks ? (
+                {loadingDevices ? (
                   <div className="py-6 flex justify-center">
                     <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   </div>
                 ) : (
                   <div className="max-h-56 overflow-y-auto border border-neutral-100 rounded-lg p-2 space-y-1">
-                    {filteredTrucks.length === 0 ? (
+                    {filteredDevices.length === 0 ? (
                       <p className="text-sm text-neutral-400 text-center py-4">
-                        {gpsLinkedTrucks.length === 0
-                          ? 'No trucks have a GPS device linked yet — link one first on Live Tracking.'
-                          : 'No trucks found.'}
+                        {allDevices.length === 0 ? 'No devices found on Live Tracking.' : 'No devices found.'}
                       </p>
-                    ) : filteredTrucks.map((truck) => (
-                      <label key={truck.id} className="flex items-center gap-2 text-sm text-neutral-600 cursor-pointer px-1.5 py-1 rounded hover:bg-neutral-50">
+                    ) : filteredDevices.map((device) => (
+                      <label key={device.deviceImei} className="flex items-center gap-2 text-sm text-neutral-600 cursor-pointer px-1.5 py-1 rounded hover:bg-neutral-50">
                         <input
                           type="checkbox"
-                          checked={grantedTruckIds.includes(truck.id)}
-                          onChange={() => toggleGrantedTruck(truck.id)}
+                          checked={grantedDeviceImeis.includes(device.deviceImei)}
+                          onChange={() => toggleGrantedDevice(device.deviceImei)}
                           className="rounded border-neutral-300 text-primary focus:ring-primary/30"
                         />
-                        <span className="font-medium">{truck.registration}</span>
-                        {truck.category && <span className="text-neutral-400">· {truck.category}</span>}
-                        {truck.driver && <span className="text-neutral-400">· {truck.driver}</span>}
+                        <span className="font-medium">{device.name || device.deviceImei}</span>
+                        <span className="text-neutral-400 font-mono text-xs">{device.deviceImei}</span>
+                        {device.truckRegistration && <span className="text-neutral-400">· {device.truckRegistration}</span>}
                       </label>
                     ))}
                   </div>
                 )}
-                {truckError && <p className="text-sm text-danger mt-2.5">{truckError}</p>}
+                {deviceError && <p className="text-sm text-danger mt-2.5">{deviceError}</p>}
                 <button
-                  onClick={handleSaveTruckAccess}
-                  disabled={savingTrucks || loadingTrucks}
+                  onClick={handleSaveDeviceAccess}
+                  disabled={savingDevices || loadingDevices}
                   className="btn-primary text-sm py-2 px-4 mt-3 disabled:opacity-50"
                 >
-                  {savingTrucks ? 'Saving...' : 'Save Truck Access'}
+                  {savingDevices ? 'Saving...' : 'Save Device Access'}
                 </button>
               </div>
             )}
