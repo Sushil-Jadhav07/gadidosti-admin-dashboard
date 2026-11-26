@@ -89,6 +89,13 @@ export default function Users() {
   const [savingPerm, setSavingPerm] = useState(false);
   const [permError, setPermError] = useState('');
 
+  const [allTrucks, setAllTrucks] = useState([]);
+  const [loadingTrucks, setLoadingTrucks] = useState(false);
+  const [truckSearch, setTruckSearch] = useState('');
+  const [grantedTruckIds, setGrantedTruckIds] = useState([]);
+  const [savingTrucks, setSavingTrucks] = useState(false);
+  const [truckError, setTruckError] = useState('');
+
   const [billingType, setBillingType] = useState('prepaid');
   const [creditLimitDraft, setCreditLimitDraft] = useState('50000');
   const [savingBilling, setSavingBilling] = useState(false);
@@ -131,6 +138,52 @@ export default function Users() {
     setPermPages(selectedUser?.page_permissions || []);
     setPermError('');
   }, [selectedUser?.id, selectedUser?.page_permissions]);
+
+  // Truck Access (gps_owner only) — fetches the full truck list once per opened account (not
+  // reused across different gps_owner accounts in the same session, since the admin might add a
+  // truck in between) and this account's currently-granted subset, to seed the checklist.
+  useEffect(() => {
+    if (selectedUser?.role !== 'gps_owner') return;
+    setTruckError('');
+    setLoadingTrucks(true);
+    (async () => {
+      try {
+        const [trucksRes, grantedRes] = await Promise.all([
+          api.get('/api/vehicles/trucks?limit=100', getToken()),
+          api.get(`/api/admin/users/${selectedUser.id}/gps-trucks`, getToken()),
+        ]);
+        if (trucksRes.success) setAllTrucks(trucksRes.data.trucks || []);
+        if (grantedRes.success) setGrantedTruckIds((grantedRes.data.trucks || []).map((t) => t.id));
+      } catch {
+        setTruckError('Network error — could not load trucks');
+      } finally {
+        setLoadingTrucks(false);
+      }
+    })();
+  }, [selectedUser?.id, selectedUser?.role]);
+
+  const toggleGrantedTruck = (id) => {
+    setGrantedTruckIds((current) => (current.includes(id) ? current.filter((t) => t !== id) : [...current, id]));
+  };
+
+  const handleSaveTruckAccess = async () => {
+    if (!selectedUser) return;
+    setSavingTrucks(true);
+    setTruckError('');
+    try {
+      const data = await api.patch(`/api/admin/users/${selectedUser.id}/gps-trucks`, { truck_ids: grantedTruckIds }, getToken());
+      if (!data.success) throw new Error(data.message || 'Failed to update truck access');
+      showToast('Truck access updated');
+    } catch (err) {
+      setTruckError(err.message || 'Failed to update truck access');
+    } finally {
+      setSavingTrucks(false);
+    }
+  };
+
+  const filteredTrucks = allTrucks.filter((t) =>
+    !truckSearch || t.registration?.toLowerCase().includes(truckSearch.toLowerCase())
+  );
 
   // Re-seeds the billing-type form whenever a different client is opened — credit limit drafts
   // to the existing value if they're already postpaid, otherwise the ₹50,000 default.
@@ -779,6 +832,53 @@ export default function Users() {
                   className="btn-primary text-sm py-2 px-4 mt-3 disabled:opacity-50"
                 >
                   {savingPerm ? 'Saving...' : 'Save Access'}
+                </button>
+              </div>
+            )}
+
+            {selectedUser.role === 'gps_owner' && (
+              <div className="border-t border-neutral-100 pt-4">
+                <p className="text-xs font-semibold text-neutral-500 mb-2.5">Truck Access</p>
+                <p className="text-xs text-neutral-400 mb-3">
+                  Only checked trucks' GPS devices are visible to this account on Live Tracking — nothing is granted by default.
+                </p>
+                <input
+                  type="text"
+                  value={truckSearch}
+                  onChange={(e) => setTruckSearch(e.target.value)}
+                  placeholder="Search by registration..."
+                  className="form-input text-sm mb-2.5"
+                />
+                {loadingTrucks ? (
+                  <div className="py-6 flex justify-center">
+                    <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto border border-neutral-100 rounded-lg p-2 space-y-1">
+                    {filteredTrucks.length === 0 ? (
+                      <p className="text-sm text-neutral-400 text-center py-4">No trucks found.</p>
+                    ) : filteredTrucks.map((truck) => (
+                      <label key={truck.id} className="flex items-center gap-2 text-sm text-neutral-600 cursor-pointer px-1.5 py-1 rounded hover:bg-neutral-50">
+                        <input
+                          type="checkbox"
+                          checked={grantedTruckIds.includes(truck.id)}
+                          onChange={() => toggleGrantedTruck(truck.id)}
+                          className="rounded border-neutral-300 text-primary focus:ring-primary/30"
+                        />
+                        <span className="font-medium">{truck.registration}</span>
+                        {truck.category && <span className="text-neutral-400">· {truck.category}</span>}
+                        {truck.driver && <span className="text-neutral-400">· {truck.driver}</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {truckError && <p className="text-sm text-danger mt-2.5">{truckError}</p>}
+                <button
+                  onClick={handleSaveTruckAccess}
+                  disabled={savingTrucks || loadingTrucks}
+                  className="btn-primary text-sm py-2 px-4 mt-3 disabled:opacity-50"
+                >
+                  {savingTrucks ? 'Saving...' : 'Save Truck Access'}
                 </button>
               </div>
             )}

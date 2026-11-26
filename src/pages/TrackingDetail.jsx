@@ -4,7 +4,7 @@ import { ArrowLeft, History, Gauge, Compass, Fuel, BatteryFull, Truck, Link2, Un
 import Badge from '../components/Badge';
 import MapView from '../components/MapView';
 import Toast from '../components/Toast';
-import { api, getToken } from '../services/api';
+import { api, getToken, getStoredAuth } from '../services/api';
 import { buildTruckIcon } from '../lib/truckIcon';
 
 const POLL_INTERVAL_MS = 15000;
@@ -143,6 +143,11 @@ function QuickStat({ icon: Icon, label, value }) {
 export default function TrackingDetail() {
   const { imei } = useParams();
   const navigate = useNavigate();
+  // gps_owner accounts can see which truck a device is linked to, but the backend now rejects
+  // the link-truck call from that role outright (fleet-wide device linking is admin/staff only,
+  // separate from which trucks a gps_owner is allowed to SEE — see Users.jsx's Truck Access
+  // editor) — hide the edit controls rather than showing a button that would just 403.
+  const canLinkTruck = getStoredAuth()?.user?.role !== 'gps_owner';
   const [device, setDevice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -276,36 +281,42 @@ export default function TrackingDetail() {
             <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
               <Truck size={13} /> Linked Truck
             </p>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <input
-                type="text"
-                value={regInput}
-                onChange={(e) => setRegInput(e.target.value)}
-                placeholder="e.g. MH12AB1234"
-                className="form-input flex-1 font-mono uppercase"
-              />
-              <button
-                onClick={handleLinkTruck}
-                disabled={linking || !regInput.trim()}
-                className="btn-primary !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <Link2 size={14} /> {device.truckRegistration ? 'Change' : 'Link'}
-              </button>
-              {device.truckRegistration && (
-                <button
-                  onClick={handleUnlinkTruck}
-                  disabled={linking}
-                  className="btn-secondary !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  <Unlink size={14} /> Unlink
-                </button>
-              )}
-            </div>
-            {linkError && <p className="text-xs text-danger mt-2">{linkError}</p>}
+            {canLinkTruck ? (
+              <>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="text"
+                    value={regInput}
+                    onChange={(e) => setRegInput(e.target.value)}
+                    placeholder="e.g. MH12AB1234"
+                    className="form-input flex-1 font-mono uppercase"
+                  />
+                  <button
+                    onClick={handleLinkTruck}
+                    disabled={linking || !regInput.trim()}
+                    className="btn-primary !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Link2 size={14} /> {device.truckRegistration ? 'Change' : 'Link'}
+                  </button>
+                  {device.truckRegistration && (
+                    <button
+                      onClick={handleUnlinkTruck}
+                      disabled={linking}
+                      className="btn-secondary !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Unlink size={14} /> Unlink
+                    </button>
+                  )}
+                </div>
+                {linkError && <p className="text-xs text-danger mt-2">{linkError}</p>}
+              </>
+            ) : null}
             <p className="text-xs text-neutral-400 mt-2">
               {device.truckRegistration
                 ? `Currently linked to ${device.truckRegistration}.`
-                : 'Not linked to any truck yet — enter its registration number above.'}
+                : canLinkTruck
+                  ? 'Not linked to any truck yet — enter its registration number above.'
+                  : 'Not linked to any truck yet.'}
             </p>
           </div>
 
