@@ -181,7 +181,11 @@ export default function Users() {
     }
   };
 
-  const filteredTrucks = allTrucks.filter((t) =>
+  // Only trucks that actually have a GPS device linked (see Live Tracking's Linked Truck card) —
+  // granting a gps_owner a truck with no tracker on it would be a no-op with nothing for them to
+  // ever see, so it's left out of this list entirely rather than shown as a dead-end option.
+  const gpsLinkedTrucks = allTrucks.filter((t) => t.gpsDeviceImei);
+  const filteredTrucks = gpsLinkedTrucks.filter((t) =>
     !truckSearch || t.registration?.toLowerCase().includes(truckSearch.toLowerCase())
   );
 
@@ -840,7 +844,7 @@ export default function Users() {
               <div className="border-t border-neutral-100 pt-4">
                 <p className="text-xs font-semibold text-neutral-500 mb-2.5">Truck Access</p>
                 <p className="text-xs text-neutral-400 mb-3">
-                  Only checked trucks' GPS devices are visible to this account on Live Tracking — nothing is granted by default.
+                  Only trucks with a GPS device already linked are listed. Only checked ones are visible to this account on Live Tracking — nothing is granted by default.
                 </p>
                 <input
                   type="text"
@@ -856,7 +860,11 @@ export default function Users() {
                 ) : (
                   <div className="max-h-56 overflow-y-auto border border-neutral-100 rounded-lg p-2 space-y-1">
                     {filteredTrucks.length === 0 ? (
-                      <p className="text-sm text-neutral-400 text-center py-4">No trucks found.</p>
+                      <p className="text-sm text-neutral-400 text-center py-4">
+                        {gpsLinkedTrucks.length === 0
+                          ? 'No trucks have a GPS device linked yet — link one first on Live Tracking.'
+                          : 'No trucks found.'}
+                      </p>
                     ) : filteredTrucks.map((truck) => (
                       <label key={truck.id} className="flex items-center gap-2 text-sm text-neutral-600 cursor-pointer px-1.5 py-1 rounded hover:bg-neutral-50">
                         <input
