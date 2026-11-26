@@ -48,8 +48,8 @@ const fmtTime = (iso) => {
   });
 };
 
-const ROLES = ['', 'client', 'broker', 'driver', 'admin', 'staff'];
-const ADD_USER_ROLES = ['staff', 'admin'];
+const ROLES = ['', 'client', 'broker', 'driver', 'admin', 'staff', 'gps_owner'];
+const ADD_USER_ROLES = ['staff', 'gps_owner', 'admin'];
 const EMPTY_ADD_FORM = { name: '', phone: '', email: '', password: '', role: 'staff' };
 const STATUSES = ['', 'active', 'inactive', 'blocked'];
 const KYC_STATUSES = ['', 'pending', 'submitted', 'verified', 'rejected'];
@@ -755,7 +755,7 @@ export default function Users() {
               </div>
             )}
 
-            {selectedUser.role === 'staff' && (
+            {(selectedUser.role === 'staff' || selectedUser.role === 'gps_owner') && (
               <div className="border-t border-neutral-100 pt-4">
                 <p className="text-xs font-semibold text-neutral-500 mb-2.5">Page Access</p>
                 <p className="text-xs text-neutral-400 mb-3">Only checked pages are reachable for this account — nothing is granted by default.</p>
@@ -874,7 +874,7 @@ export default function Users() {
                       : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
                   }`}
                 >
-                  {cap(r)}
+                  {roleLabel(r)}
                 </button>
               ))}
             </div>
@@ -913,7 +913,7 @@ export default function Users() {
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowAddUser(false)} className="btn-secondary">Cancel</button>
             <button onClick={handleAddUser} disabled={addingUser} className="btn-primary disabled:opacity-50">
-              {addingUser ? 'Creating...' : `Create ${cap(addForm.role)}`}
+              {addingUser ? 'Creating...' : `Create ${roleLabel(addForm.role)}`}
             </button>
           </div>
         </div>

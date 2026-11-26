@@ -20,11 +20,13 @@ export const PAGE_KEYS = [
   { key: 'legal_pages', label: 'Legal Pages' },
 ];
 
-// admin = always full access (superadmin, never checked). staff = only what's been explicitly
-// granted, empty by default. Anyone else (shouldn't reach this dashboard at all) = no access.
+// admin = always full access (superadmin, never checked). staff/gps_owner = only what's been
+// explicitly granted, empty by default — gps_owner is mechanically identical to staff here, just
+// a distinct label for an account meant to only ever be granted the 'tracking' page. Anyone else
+// (shouldn't reach this dashboard at all) = no access.
 export const hasPageAccess = (user, pageKey) => {
   if (!user) return false;
   if (user.role === 'admin') return true;
-  if (user.role === 'staff') return (user.page_permissions || []).includes(pageKey);
+  if (user.role === 'staff' || user.role === 'gps_owner') return (user.page_permissions || []).includes(pageKey);
   return false;
 };

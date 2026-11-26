@@ -59,6 +59,7 @@ export default function Tracking() {
     !searchTerm ||
     d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.deviceImei?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    d.truckRegistration?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     statusLabel(d.status).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -89,7 +90,7 @@ export default function Tracking() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
-            placeholder="Search by name, IMEI or status..."
+            placeholder="Search by name, IMEI, truck or status..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="form-input pl-9"
@@ -141,6 +142,7 @@ export default function Tracking() {
                 <tr>
                   <th>Name</th>
                   <th>IMEI</th>
+                  <th>Linked Truck</th>
                   <th>Status</th>
                   <th>Speed</th>
                   <th>Ignition</th>
@@ -150,11 +152,12 @@ export default function Tracking() {
               </thead>
               <tbody>
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-neutral-400">No devices found.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-12 text-neutral-400">No devices found.</td></tr>
                 ) : paginated.map((device) => (
                   <tr key={device.deviceImei}>
                     <td className="font-medium text-neutral-800">{device.name || '—'}</td>
                     <td className="whitespace-nowrap font-mono text-xs text-neutral-500">{device.deviceImei}</td>
+                    <td className="whitespace-nowrap">{device.truckRegistration || <span className="text-neutral-300">Not linked</span>}</td>
                     <td><Badge status={statusLabel(device.status)} /></td>
                     <td className="whitespace-nowrap flex items-center gap-1"><Gauge size={13} className="text-neutral-400" />{device.speed ?? '—'} km/hr</td>
                     <td>{device.ignition === true ? 'On' : device.ignition === false ? 'Off' : '—'}</td>

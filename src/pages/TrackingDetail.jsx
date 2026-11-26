@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, History, Gauge, Compass, Fuel, BatteryFull } from 'lucide-react';
+import { ArrowLeft, History, Gauge, Compass, Fuel, BatteryFull, Truck, Link2, Unlink } from 'lucide-react';
 import Badge from '../components/Badge';
 import MapView from '../components/MapView';
+import Toast from '../components/Toast';
 import { api, getToken } from '../services/api';
 import { buildTruckIcon } from '../lib/truckIcon';
 
@@ -145,6 +146,10 @@ export default function TrackingDetail() {
   const [device, setDevice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [regInput, setRegInput] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [toast, setToast] = useState(null);
 
   const fetchDevice = useCallback(async ({ silent } = {}) => {
     if (!silent) setLoading(true);
@@ -173,6 +178,44 @@ export default function TrackingDetail() {
     const interval = setInterval(() => fetchDevice({ silent: true }), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchDevice]);
+
+  // Only resyncs the input from the server on the IMEI actually changing (not on every silent
+  // poll) — otherwise a change the admin is mid-typing would get overwritten by the next poll
+  // tick before they finish.
+  useEffect(() => {
+    setRegInput(device?.truckRegistration || '');
+  }, [imei]);
+
+  const handleLinkTruck = async () => {
+    setLinking(true);
+    setLinkError('');
+    try {
+      const res = await api.patch(`/api/tracking/devices/${imei}/link-truck`, { registration: regInput.trim() }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to link device');
+      setDevice((current) => (current ? { ...current, truckRegistration: res.data?.truck?.registration || null, truckId: res.data?.truck?.id || null } : current));
+      setToast({ message: res.data?.truck ? 'Device linked to truck' : 'Device unlinked', type: 'success' });
+    } catch (err) {
+      setLinkError(err.message || 'Failed to link device');
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const handleUnlinkTruck = async () => {
+    setRegInput('');
+    setLinking(true);
+    setLinkError('');
+    try {
+      const res = await api.patch(`/api/tracking/devices/${imei}/link-truck`, { registration: '' }, getToken());
+      if (!res.success) throw new Error(res.message || 'Failed to unlink device');
+      setDevice((current) => (current ? { ...current, truckRegistration: null, truckId: null } : current));
+      setToast({ message: 'Device unlinked', type: 'success' });
+    } catch (err) {
+      setLinkError(err.message || 'Failed to unlink device');
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const marker = device && device.latitude != null && device.longitude != null
     ? [{ id: device.deviceImei, position: { lat: Number(device.latitude), lng: Number(device.longitude) }, iconUrl: buildTruckIcon(device.course), title: device.name }]
@@ -225,6 +268,47 @@ export default function TrackingDetail() {
             <QuickStat icon={BatteryFull} label="Last Update" value={formatDateTime(device.lastUpdate)} />
           </div>
 
+          {/* Linked truck — devices have no concept of "our trucks" on the vendor side at all;
+              this is the only place that link is set or shown. Plain registration-number text
+              lookup rather than a full truck picker, since gps_owner accounts never get access
+              to the Trucks page to browse one. */}
+          <div className="card p-4">
+            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <Truck size={13} /> Linked Truck
+            </p>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input
+                type="text"
+                value={regInput}
+                onChange={(e) => setRegInput(e.target.value)}
+                placeholder="e.g. MH12AB1234"
+                className="form-input flex-1 font-mono uppercase"
+              />
+              <button
+                onClick={handleLinkTruck}
+                disabled={linking || !regInput.trim()}
+                className="btn-primary !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <Link2 size={14} /> {device.truckRegistration ? 'Change' : 'Link'}
+              </button>
+              {device.truckRegistration && (
+                <button
+                  onClick={handleUnlinkTruck}
+                  disabled={linking}
+                  className="btn-secondary !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Unlink size={14} /> Unlink
+                </button>
+              )}
+            </div>
+            {linkError && <p className="text-xs text-danger mt-2">{linkError}</p>}
+            <p className="text-xs text-neutral-400 mt-2">
+              {device.truckRegistration
+                ? `Currently linked to ${device.truckRegistration}.`
+                : 'Not linked to any truck yet — enter its registration number above.'}
+            </p>
+          </div>
+
           {/* Map — full width, modest height, so it doesn't push the details far down the page */}
           <div className="card p-2 overflow-hidden">
             {marker.length ? (
@@ -267,6 +351,8 @@ export default function TrackingDetail() {
           <button onClick={() => fetchDevice()} className="text-sm text-primary underline">Retry</button>
         </div>
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

@@ -6,5 +6,6 @@
 export const roleLabel = (role) => {
   if (!role) return '';
   if (role === 'driver') return 'Lorry Owner';
+  if (role === 'gps_owner') return 'GPS Owner';
   return role.charAt(0).toUpperCase() + role.slice(1);
 };
